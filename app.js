@@ -5,7 +5,10 @@ const Store = window.Store;
 const CFG = window.FF1_CONFIG || {};
 let S = null;            // estado actual (Store.state())
 let user = localStorage.getItem("ff1_user") || null;     // código de jugador
-let admin = localStorage.getItem("ff1_admin") === "1";
+let viewAsPlayer = localStorage.getItem("ff1_view_player") === "1"; // admin viendo como jugador
+let admin = false;                                       // se calcula en render() según whitelist
+const ADMINS = (window.FF1_CONFIG && window.FF1_CONFIG.ADMINS) || [];
+const canBeAdmin = code => ADMINS.includes(code);
 let tab = "tabla";
 let ui = { equipoRace: null, equipoPlayer: null, resRace: null, pilotosAll: false };
 
@@ -138,6 +141,7 @@ const money = n => "$" + Number(n).toLocaleString("es-MX");
 // ============================================================
 function render() {
   S = Store.state();
+  admin = !!user && canBeAdmin(user) && !viewAsPlayer;   // admin automático por whitelist
   renderWho();
   const v = $("#view"); v.innerHTML = "";
   if (!user) { showLogin(); return; }
@@ -148,16 +152,18 @@ function render() {
 function renderWho() {
   const w = $("#whoBox");
   if (!user) { w.innerHTML = ""; return; }
+  const isAdminUser = canBeAdmin(user);
   w.innerHTML = `Eres <b>${esc(playerName(user))}</b>${admin ? ' <span class="badge done">ADMIN</span>' : ""}
-    <a id="changeUser">cambiar</a> <a id="adminToggle">${admin ? "salir admin" : "🔧 admin"}</a>`;
-  $("#changeUser").onclick = () => { localStorage.removeItem("ff1_user"); user = null; render(); };
-  $("#adminToggle").onclick = () => {
-    if (admin) { admin = false; localStorage.removeItem("ff1_admin"); render(); }
-    else {
-      const p = prompt("Código de admin:");
-      if (p === CFG.ADMIN_PASSCODE) { admin = true; localStorage.setItem("ff1_admin", "1"); toast("Modo admin activado", "ok"); render(); }
-      else if (p != null) toast("Código incorrecto", "err");
-    }
+    <a id="changeUser">cambiar</a>${isAdminUser ? ` <a id="adminToggle">${viewAsPlayer ? "🔧 volver a admin" : "👁️ ver como jugador"}</a>` : ""}`;
+  $("#changeUser").onclick = () => {
+    localStorage.removeItem("ff1_user"); user = null;
+    viewAsPlayer = false; localStorage.removeItem("ff1_view_player"); render();
+  };
+  const at = $("#adminToggle");
+  if (at) at.onclick = () => {
+    viewAsPlayer = !viewAsPlayer;
+    localStorage.setItem("ff1_view_player", viewAsPlayer ? "1" : "0");
+    toast(viewAsPlayer ? "Viendo como jugador" : "Modo admin", "ok"); render();
   };
 }
 
@@ -503,12 +509,6 @@ function showLogin() {
   };
   $("#loginBtn").onclick = tryLogin;
   $("#loginPass").onkeydown = e => { if (e.key === "Enter") tryLogin(); };
-  $("#adminBtn").onclick = () => {
-    if ($("#adminPass").value === CFG.ADMIN_PASSCODE) {
-      admin = true; localStorage.setItem("ff1_admin", "1");
-      user = sel.value; localStorage.setItem("ff1_user", user); m.hidden = true; render();
-    } else toast("Código de admin incorrecto", "err");
-  };
 }
 
 // ---------- init ----------
