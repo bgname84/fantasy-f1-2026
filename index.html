@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fantasy F1 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,600;0,700;0,900;1,700;1,900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="bolt">🏁</span>
+    <div>
+      <div class="brand-title">FANTASY F1</div>
+      <div class="brand-sub">Temporada 2026</div>
+    </div>
+  </div>
+  <div class="who" id="whoBox"></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="tabla" class="active">🏆 Tabla</button>
+  <button data-tab="equipo">🏎️ Mi equipo</button>
+  <button data-tab="pilotos">📊 Pilotos</button>
+  <button data-tab="resultados">🧮 Resultados</button>
+  <button data-tab="pagos">💵 Pagos</button>
+</nav>
+
+<main id="view"></main>
+
+<!-- Login modal -->
+<div class="modal-bg" id="loginModal" hidden>
+  <div class="modal">
+    <h2>¿Quién eres?</h2>
+    <p class="muted">Elige tu nombre e ingresa tu código para gestionar tus pilotos.</p>
+    <select id="loginSelect" class="big-select"></select>
+    <input type="text" id="loginPass" placeholder="Tu código (ej. AB12)" class="input" autocomplete="off" style="margin-top:10px;text-transform:uppercase">
+    <div id="loginErr" class="small err" style="margin-top:6px"></div>
+    <button class="btn primary block" id="loginBtn">Entrar</button>
+    <hr>
+    <details>
+      <summary>Soy el organizador (admin)</summary>
+      <input type="password" id="adminPass" placeholder="Código de admin" class="input">
+      <button class="btn block" id="adminBtn">Entrar como admin</button>
+    </details>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="schedule.js"></script>
+<script src="data.js"></script>
+<script src="store.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
