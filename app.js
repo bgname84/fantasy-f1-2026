@@ -37,6 +37,61 @@ function raceDeadline(race) {
   return iso ? new Date(iso) : null;
 }
 function raceTimes(race) { return SCHED[race.name] || {}; }
+// CDMX (UTC-6, sin horario de verano) <-> input datetime-local / ISO UTC
+function toCDMXInputValue(date) { return new Date(date.getTime() - 6 * 3600 * 1000).toISOString().slice(0, 16); }
+function cdmxInputToUTCISO(val) { return new Date(val.slice(0, 16) + ":00-06:00").toISOString(); }
+
+// ---------- cargar resultados oficiales (API Ergast/Jolpica) ----------
+const normName = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\./g, "").trim();
+const apiRaces = j => (j && j.MRData && j.MRData.RaceTable && j.MRData.RaceTable.Races) || [];
+async function apiFetch(url, optional) {
+  try { const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+  catch (e) { if (optional) { console.warn("opcional falló", url, e); return null; } throw e; }
+}
+async function loadOfficialResults(race) {
+  const round = raceTimes(race).apiRound;
+  if (!round) { toast("Esta carrera no tiene ronda oficial.", "err"); return; }
+  const base = `https://api.jolpi.ca/ergast/f1/2026/${round}`;
+  const sprint = raceSprint(race);
+  toast("Cargando resultados oficiales…");
+  // results es obligatorio; quali y sprint son opcionales (si fallan, sus bonos/sprint quedan en 0)
+  let rr, qq, ss;
+  try {
+    [rr, qq, ss] = await Promise.all([
+      apiFetch(base + "/results.json?limit=100", false),
+      apiFetch(base + "/qualifying.json?limit=100", true),
+      sprint ? apiFetch(base + "/sprint.json?limit=100", true) : Promise.resolve(null),
+    ]);
+  } catch (e) { console.error(e); toast("La API de F1 respondió con error. Intenta de nuevo en un momento.", "err"); return; }
+  const rRace = apiRaces(rr)[0];
+  if (!rRace || !rRace.Results) { toast("Aún no hay resultados oficiales de esta carrera.", "err"); return; }
+  try {
+    // mapas piloto<->equipo desde nuestro roster
+    const sur2name = {}, teammate = {};
+    S.teams.forEach(tm => {
+      tm.drivers.forEach(d => sur2name[normName(d.split(" ").pop())] = d);
+      if (tm.drivers.length === 2) { teammate[tm.drivers[0]] = tm.drivers[1]; teammate[tm.drivers[1]] = tm.drivers[0]; }
+    });
+    const nameOf = e => sur2name[normName(e.Driver.familyName)];
+    const qpos = {}, rpos = {}, posText = {}, spos = {};
+    rRace.Results.forEach(r => { const n = nameOf(r); if (!n) return; rpos[n] = +r.position; posText[n] = r.positionText; });
+    ((apiRaces(qq)[0] || {}).QualifyingResults || []).forEach(q => { const n = nameOf(q); if (n) qpos[n] = +q.position; });
+    if (sprint) ((apiRaces(ss)[0] || {}).SprintResults || []).forEach(s => { const n = nameOf(s); if (n) spos[n] = +s.position; });
+    const finished = n => /^\d+$/.test(posText[n]);   // clasificado como finalizador
+    // construir resultados. Bonos SOLO si el coequipero del roster participó (no sustituto/ausente).
+    // rBonus solo si el piloto terminó la carrera (no premia doble-DNF). DOTD lo pone el admin.
+    const entries = Object.keys(rpos).map(n => {
+      const tm = teammate[n];
+      const tmRaced = tm && (tm in rpos);
+      const qB = (n in qpos && tmRaced && (!(tm in qpos) || qpos[n] < qpos[tm])) ? 1 : 0;
+      const rB = (finished(n) && tmRaced && rpos[n] < rpos[tm]) ? 1 : 0;
+      return { driver: n, data: { position: finished(n) ? +posText[n] : "DNF", sprintPos: sprint ? (spos[n] || 0) : 0, qBonus: qB, rBonus: rB } };
+    });
+    await Store.setResultsBulk(race.name, entries);
+    toast(`✔ Cargados ${entries.length} pilotos · revisa DOTD y bonos`, "ok");
+    render();
+  } catch (e) { console.error(e); toast("Error procesando los resultados.", "err"); }
+}
 function isLockedForPlayers(race) {
   if (race.status === "cancelled" || race.status === "done") return true;
   const dl = raceDeadline(race);
@@ -385,8 +440,23 @@ function viewResultados(v) {
   const dl = raceDeadline(race), t = raceTimes(race);
   const sched = el("div", "small muted");
   sched.style.marginTop = "10px";
-  sched.innerHTML = `🕒 Cierre de inscripción: <b>${esc(fmtCDMX(dl))}</b> (CDMX) · ${isLockedForPlayers(race) ? '<span class="err">cerrada para jugadores</span>' : '<span class="ok">abierta</span>'}${t.race ? ` · Carrera: ${esc(fmtCDMX(new Date(t.race)))}` : ""}`;
+  sched.innerHTML = `🕒 Cierre de inscripción: <b>${esc(fmtCDMX(dl))}</b> (CDMX) · ${isLockedForPlayers(race) ? '<span class="err">cerrada para jugadores</span>' : '<span class="ok">abierta</span>'}${t.race ? ` · Carrera: ${esc(fmtCDMX(new Date(t.race)))}` : ""}${race.deadline ? ' · <span class="warn">cierre personalizado</span>' : ""}`;
   bar.appendChild(sched);
+
+  // editar cierre de inscripción (admin)
+  const dlEdit = el("div", "row"); dlEdit.style.marginTop = "8px";
+  const dlInput = el("input"); dlInput.type = "datetime-local"; dlInput.className = "input"; dlInput.style.maxWidth = "220px";
+  if (dl) dlInput.value = toCDMXInputValue(dl);
+  const saveDl = el("button", "btn", "Guardar cierre");
+  saveDl.onclick = () => {
+    if (!dlInput.value) { toast("Pon fecha y hora", "err"); return; }
+    Store.setRaceMeta(race.name, { deadline: cdmxInputToUTCISO(dlInput.value) }).then(() => { toast("Cierre actualizado", "ok"); render(); });
+  };
+  const resetDl = el("button", "btn", "Restaurar oficial");
+  resetDl.onclick = () => Store.setRaceMeta(race.name, { deadline: null }).then(() => { toast("Cierre oficial restaurado", "ok"); render(); });
+  dlEdit.appendChild(wrapLabel("Editar cierre (hora CDMX)", dlInput));
+  dlEdit.appendChild(saveDl); dlEdit.appendChild(resetDl);
+  bar.appendChild(dlEdit);
 
   const lockRow = el("div", "row"); lockRow.style.marginTop = "10px";
   const lockBtn = el("button", "btn " + (race.status === "done" ? "" : "primary"), race.status === "done" ? "🔓 Reabrir carrera" : "🔒 Cerrar carrera (oficial)");
@@ -405,9 +475,12 @@ function viewResultados(v) {
   const card = el("div", "card");
   const hd = el("div", "row");
   hd.innerHTML = `<b>Captura por piloto</b> <span class="muted small">(${picked.size} pilotos elegidos por jugadores)</span><div class="spacer"></div>`;
+  const loadBtn = el("button", "btn primary", "⬇️ Cargar resultados oficiales");
+  loadBtn.onclick = () => loadOfficialResults(race);
   const tgl = el("button", "btn", ui.resAll ? "Solo elegidos" : "Mostrar los 22");
   tgl.onclick = () => { ui.resAll = !ui.resAll; render(); };
-  hd.appendChild(tgl); card.appendChild(hd);
+  hd.appendChild(loadBtn); hd.appendChild(tgl); card.appendChild(hd);
+  card.appendChild(el("div", "small muted", "“Cargar resultados oficiales” trae posiciones, sprint y bonos de coequipero desde la F1 (re-ejecutable si hay cambios). El <b>Driver of the Day</b> y cualquier ajuste se ponen a mano abajo."));
 
   if (!show.length) { card.appendChild(el("div", "notice", "Aún nadie eligió pilotos para esta carrera.")); v.appendChild(card); return; }
 

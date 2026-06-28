@@ -76,6 +76,13 @@
         overlay.results[race] = overlay.results[race] || {};
         overlay.results[race][driver] = Object.assign({}, overlay.results[race][driver], data); save();
       },
+      async setResultsBulk(race, entries) {
+        overlay.results[race] = overlay.results[race] || {};
+        entries.forEach(({ driver, data }) => {
+          overlay.results[race][driver] = Object.assign({}, overlay.results[race][driver], data);
+        });
+        save();
+      },
       async clearResult(race, driver) {
         if (overlay.results[race]) { delete overlay.results[race][driver]; save(); }
       },
@@ -132,6 +139,14 @@
       async setResult(race, driver, data) {
         const cur = (overlay.results[race] || {})[driver] || {};
         await sb.from("results").upsert({ race, driver, data: Object.assign({}, cur, data) });
+        await pull(); listeners.forEach(f => f());
+      },
+      async setResultsBulk(race, entries) {
+        const rows = entries.map(({ driver, data }) => {
+          const cur = (overlay.results[race] || {})[driver] || {};
+          return { race, driver, data: Object.assign({}, cur, data) };
+        });
+        if (rows.length) await sb.from("results").upsert(rows);
         await pull(); listeners.forEach(f => f());
       },
       async clearResult(race, driver) {

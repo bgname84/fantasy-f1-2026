@@ -101,10 +101,17 @@ y subir la carpeta `app/` a la web (GitHub Pages). 10 minutos:
 
 ## Flujo de cada carrera (para el organizador)
 
-1. En **Resultados**, elige la carrera y ajusta *Formato* (sprint/normal) y *pilotos a elegir* (3/4).
+1. En **Resultados**, elige la carrera y ajusta *pilotos a elegir* (3/4). Si hace falta, edita el
+   **cierre de inscripción** (campo fecha/hora en CDMX) o pulsa *Restaurar oficial*.
 2. Los jugadores capturan sus pilotos en **Mi equipo** antes de la clasificación.
-3. Tras la carrera, en **Resultados** capturas posición, sprint, DOTD y bonos. Los puntos salen solos.
+3. Tras la carrera, pulsa **⬇️ Cargar resultados oficiales**: trae posiciones, sprint y bonos de
+   coequipero desde la F1 real (API Ergast/Jolpica) y calcula los puntos. Es **re-ejecutable** si la
+   FIA modifica un resultado. El **Driver of the Day** (la API no lo da) y cualquier ajuste se ponen a
+   mano en la tabla de captura.
 4. **🔒 Cerrar carrera** → se congela la tabla y nadie puede cambiar picks.
+
+> El cargador es un asistente: posiciones y puntos salen exactos; los bonos de coequipero son un
+> cálculo automático que conviene revisar (casos como pilotos sustitutos o doble abandono).
 
 ---
 
