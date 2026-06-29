@@ -13,7 +13,7 @@ body{margin:0;font-family:"Titillium Web",-apple-system,BlinkMacSystemFont,"Sego
 }
 .topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;position:relative;
   background:linear-gradient(90deg,#0a0a0c,#15171f 60%,#1b1e27);border-bottom:3px solid var(--red);overflow:hidden}
-.topbar::after{content:"";position:absolute;right:-40px;top:0;bottom:0;width:160px;
+.topbar::after{content:"";position:absolute;right:-40px;top:0;bottom:0;width:160px;pointer-events:none;
   background:linear-gradient(105deg,transparent 30%,var(--red) 30% 42%,transparent 42% 52%,var(--red) 52% 60%,transparent 60%);opacity:.5}
 .brand{display:flex;align-items:center;gap:12px;z-index:1}
 .bolt{font-size:26px}
