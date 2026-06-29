@@ -623,20 +623,31 @@ function consultaSection(v) {
   sel.onchange = () => { ui.consultaPlayer = sel.value; render(); };
   const bar = el("div", "row");
   bar.appendChild(wrapLabel("Ver jugador", sel));
-  bar.appendChild(el("div", "small muted", "Solo lectura · carreras ya corridas"));
+  bar.appendChild(el("div", "small muted", "Solo lectura · desglose por piloto"));
   card.appendChild(bar);
+
   const scored = scoredRaces();
-  let h = '<table class="hist"><thead><tr><th>Carrera</th><th>Pilotos (pts c/u)</th><th class="num">Pts</th></tr></thead><tbody>';
+  const chk = x => x ? "✓" : "";
+  let h = '<table class="capture breakdown"><thead><tr><th>Piloto</th><th>Pos</th><th>Spr</th><th>Q</th><th>R</th><th>DOTD</th><th class="num">Pts</th></tr></thead><tbody>';
+  let grand = 0, any = false;
   scored.forEach(r => {
     const pk = picksOf(r.name, code);
-    const det = pk.length
-      ? pk.map(d => `${esc(d)} <span class="muted">(${driverPoints(S.results[r.name] && S.results[r.name][d])})</span>`).join(", ")
-      : '<span class="muted">— sin selección —</span>';
-    h += `<tr><td>R${r.round} ${esc(r.name)}</td><td>${det}</td><td class="num">${playerRacePts(r.name, code) || 0}</td></tr>`;
+    if (!pk.length) return;
+    any = true;
+    const rp = playerRacePts(r.name, code) || 0; grand += rp;
+    h += `<tr class="grp"><td colspan="6">R${r.round} · ${esc(r.name)}${raceSprint(r) ? " (sprint)" : ""}</td><td class="num">${rp}</td></tr>`;
+    pk.forEach(d => {
+      const x = (S.results[r.name] && S.results[r.name][d]) || {};
+      h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span>${esc(lastName(d))} <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
+        + `<td>${x.position != null ? esc(String(x.position)) : ""}</td>`
+        + `<td>${sprintPts(x.sprintPos) || ""}</td>`
+        + `<td class="ok">${chk(x.qBonus)}</td><td class="ok">${chk(x.rBonus)}</td><td style="color:var(--gold)">${chk(x.otd)}</td>`
+        + `<td class="num"><b>${driverPoints(x)}</b></td></tr>`;
+    });
   });
-  const tot = scored.reduce((s, r) => s + playerRacePts(r.name, code), 0);
-  h += `</tbody><tfoot><tr><th>TOTAL</th><th></th><th class="num">${tot}</th></tr></tfoot></table>`;
-  const wrap = el("div"); wrap.innerHTML = h; card.appendChild(wrap);   // sin .matrix: la tabla envuelve en móvil
+  h += `</tbody><tfoot><tr><th colspan="6">TOTAL</th><th class="num">${grand}</th></tr></tfoot></table>`;
+  if (!any) h = '<div class="notice">Este jugador aún no tiene resultados en carreras corridas.</div>';
+  const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
   v.appendChild(card);
 }
 

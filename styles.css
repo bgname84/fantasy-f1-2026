@@ -93,6 +93,9 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
 .drv:hover{background:rgba(255,255,255,.04)}
 .drv.picked{background:color-mix(in srgb,var(--tc) 22%,transparent);box-shadow:inset 3px 0 0 var(--tc)}
 .tdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+tr.grp td{background:var(--panel2);font-weight:800;font-size:12px;letter-spacing:.4px;color:var(--txt);
+  text-transform:uppercase;border-top:2px solid var(--red);padding-top:9px;padding-bottom:9px}
+table.breakdown td{padding:7px 8px}
 .drv.disabled{opacity:.4;cursor:not-allowed}
 .drv .dn{font-weight:600}
 .pips{display:flex;gap:3px}
