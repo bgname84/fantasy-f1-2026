@@ -92,6 +92,74 @@ async function loadOfficialResults(race) {
     render();
   } catch (e) { console.error(e); toast("Error procesando los resultados.", "err"); }
 }
+
+// ---------- exportar a Excel (admin), parecido al archivo original ----------
+async function loadXLSX() {
+  if (window.XLSX) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+}
+async function exportResultsExcel() {
+  toast("Generando Excel…");
+  try {
+    await loadXLSX();
+    const XLSX = window.XLSX;
+    const players = S.players;
+    const scored = scoredRaces();
+    const scoredSet = new Set(scored.map(r => r.name));
+    const place = {}; standings().forEach(r => place[r.code] = r.place);
+    const wb = XLSX.utils.book_new();
+
+    // 1) Hoja "Puntos" (matriz carreras x jugadores, como el original)
+    const m = [["", ...players.map(p => p.shortName)]];
+    S.calendar.filter(r => r.status !== "cancelled").forEach(r => {
+      m.push([r.name, ...players.map(p => scoredSet.has(r.name) ? (playerRacePts(r.name, p.code) || 0) : "")]);
+    });
+    m.push([]);
+    m.push(["TOTAL", ...players.map(p => playerTotal(p.code))]);
+    m.push(["Lugar", ...players.map(p => place[p.code])]);
+    const wsP = XLSX.utils.aoa_to_sheet(m);
+    wsP["!cols"] = [{ wch: 14 }, ...players.map(() => ({ wch: 7 }))];
+    wsP["!freeze"] = { xSplit: 1, ySplit: 1 };
+    XLSX.utils.book_append_sheet(wb, wsP, "Puntos");
+
+    // 2) Hoja "Detalle por jugador" (pilotos elegidos y puntos por carrera)
+    const det = [["Jugador", "Carrera", "Pilotos elegidos (pts c/u)", "Pts carrera"]];
+    players.forEach(p => {
+      scored.forEach(r => {
+        const pk = picksOf(r.name, p.code);
+        if (!pk.length) return;
+        det.push([p.fullName, r.name,
+          pk.map(d => `${d} (${driverPoints(S.results[r.name] && S.results[r.name][d])})`).join(", "),
+          playerRacePts(r.name, p.code) || 0]);
+      });
+    });
+    const wsD = XLSX.utils.aoa_to_sheet(det);
+    wsD["!cols"] = [{ wch: 26 }, { wch: 13 }, { wch: 60 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsD, "Detalle por jugador");
+
+    // 3) Hoja "Resultados oficiales" (por carrera, cada piloto)
+    const off = [["Carrera", "Piloto", "Equipo", "Pos", "Pts carrera", "Sprint", "Q", "R", "DOTD", "Total"]];
+    scored.forEach(r => {
+      const res = S.results[r.name] || {};
+      Object.keys(res).sort((a, b) => driverPoints(res[b]) - driverPoints(res[a])).forEach(d => {
+        const x = res[d];
+        off.push([r.name, d, teamOf(d) || "", x.position, racePts(x.position), sprintPts(x.sprintPos),
+          x.qBonus ? 1 : 0, x.rBonus ? 1 : 0, x.otd ? 1 : 0, driverPoints(x)]);
+      });
+    });
+    const wsO = XLSX.utils.aoa_to_sheet(off);
+    wsO["!cols"] = [{ wch: 13 }, { wch: 20 }, { wch: 14 }, { wch: 6 }, { wch: 10 }, { wch: 7 }, { wch: 4 }, { wch: 4 }, { wch: 5 }, { wch: 7 }];
+    XLSX.utils.book_append_sheet(wb, wsO, "Resultados oficiales");
+
+    XLSX.writeFile(wb, `Fantasy F1 2026 - Resultados (${scored.length} carreras).xlsx`);
+    toast("Excel descargado ✔", "ok");
+  } catch (e) { console.error(e); toast("No se pudo generar el Excel (revisa tu conexión).", "err"); }
+}
+
 function isLockedForPlayers(race) {
   if (race.status === "cancelled" || race.status === "done") return true;
   const dl = raceDeadline(race);
@@ -468,6 +536,14 @@ function viewResultados(v) {
   lockRow.appendChild(lockBtn);
   lockRow.appendChild(el("div", "small muted", "Cerrar = resultados oficiales; congela la tabla. (Los jugadores ya están bloqueados desde la clasificación)."));
   bar.appendChild(lockRow);
+
+  // exportar a Excel (admin)
+  const expRow = el("div", "row"); expRow.style.marginTop = "10px";
+  const expBtn = el("button", "btn", "📊 Exportar tablas a Excel");
+  expBtn.onclick = () => exportResultsExcel();
+  expRow.appendChild(expBtn);
+  expRow.appendChild(el("div", "small muted", "Descarga un Excel con la tabla de Puntos, el detalle por jugador y los resultados oficiales por carrera (estilo del archivo original)."));
+  bar.appendChild(expRow);
   v.appendChild(bar);
 
   // which drivers to show: picked by anyone (+ optional all)
