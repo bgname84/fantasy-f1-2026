@@ -264,6 +264,10 @@ const money = n => "$" + Number(n).toLocaleString("es-MX");
 // ============================================================
 function render() {
   S = Store.state();
+  if (user && !S.players.some(p => p.code === user)) {   // jugador removido por un admin → cerrar sesión
+    localStorage.removeItem("ff1_user"); user = null;
+    viewAsPlayer = false; localStorage.removeItem("ff1_view_player");
+  }
   admin = !!user && canBeAdmin(user) && !viewAsPlayer;   // admin automático por whitelist
   renderWho();
   const v = $("#view"); v.innerHTML = "";
@@ -277,7 +281,9 @@ function renderWho() {
   if (!user) { w.innerHTML = ""; return; }
   const isAdminUser = canBeAdmin(user);
   w.innerHTML = `Eres <b>${esc(playerName(user))}</b>${admin ? ' <span class="badge done">ADMIN</span>' : ""}
+    <a id="myPass">🔑 mi clave</a>
     <a id="changeUser">cambiar</a>${isAdminUser ? ` <a id="adminToggle">${viewAsPlayer ? "🔧 volver a admin" : "👁️ ver como jugador"}</a>` : ""}`;
+  $("#myPass").onclick = () => changeOwnPassword();
   $("#changeUser").onclick = () => {
     localStorage.removeItem("ff1_user"); user = null;
     viewAsPlayer = false; localStorage.removeItem("ff1_view_player"); render();
@@ -714,22 +720,137 @@ function viewPagos(v) {
     card.appendChild(el("div", "small muted", "Toca el estado para marcar pagado/pendiente (admin)."));
   }
   v.appendChild(card);
+
+  if (admin) viewGestionParticipantes(v);
+}
+
+// ---------- gestión de participantes (admin) ----------
+function viewGestionParticipantes(v) {
+  const card = el("div", "card");
+  card.appendChild(el("h2", "section", "👥 Gestión de participantes"));
+
+  // agregar
+  const addBar = el("div", "row");
+  const nameI = el("input", "input"); nameI.placeholder = "Nombre completo";
+  const passI = el("input", "input"); passI.placeholder = "Clave de acceso";
+  const addBtn = el("button", "btn primary", "➕ Agregar");
+  addBtn.onclick = async () => {
+    const name = nameI.value.trim(), pass = passI.value.trim();
+    if (name.length < 2) { toast("Escribe el nombre", "err"); return; }
+    if (pass.length < 3) { toast("La clave debe tener al menos 3 caracteres", "err"); return; }
+    const code = genCode(name);
+    await saveRosterEdit(code, { added: true, active: true, fullName: name, shortName: name.split(" ")[0], password: pass });
+    toast("Participante agregado ✔", "ok"); nameI.value = ""; passI.value = ""; render();
+  };
+  addBar.appendChild(wrapLabel("Nuevo participante", nameI));
+  addBar.appendChild(wrapLabel("Clave", passI));
+  addBar.appendChild(addBtn);
+  card.appendChild(addBar);
+
+  // lista (incluye removidos para poder restaurar)
+  const seedAll = window.SEASON_DATA.players || [];
+  const addedCodes = Object.keys(S.rosterEdits).filter(c => S.rosterEdits[c].added && !seedAll.some(p => p.code === c));
+  const allCodes = [...seedAll.map(p => p.code), ...addedCodes];
+  const tbl = el("table", "hist");
+  tbl.innerHTML = '<thead><tr><th>Jugador</th><th>Clave</th><th>Acción</th></tr></thead>';
+  const tb = el("tbody");
+  allCodes.forEach(code => {
+    const e = S.rosterEdits[code] || {};
+    const seedP = seedAll.find(p => p.code === code);
+    const name = e.fullName || (seedP ? seedP.fullName : code);
+    const active = e.active !== false;
+    const clave = (S.creds || {})[code] || e.password || "—";
+    const tr = el("tr");
+    const nameTd = el("td"); nameTd.innerHTML = active ? esc(name) : `<span style="text-decoration:line-through;opacity:.5">${esc(name)}</span> <span class="small err">removido</span>`;
+    const claveTd = el("td"); claveTd.innerHTML = `<code style="font-size:13px">${esc(String(clave))}</code>`;
+    const actTd = el("td");
+    const chBtn = el("button", "btn", "✏️"); chBtn.title = "Cambiar clave"; chBtn.onclick = () => adminChangePass(code, name);
+    actTd.appendChild(chBtn);
+    if (canBeAdmin(code)) {
+      const lbl = el("span", "small muted", " admin"); actTd.appendChild(lbl);
+    } else {
+      const rmBtn = el("button", "btn"); rmBtn.style.marginLeft = "6px";
+      rmBtn.textContent = active ? "🗑️ quitar" : "♻️ restaurar";
+      rmBtn.onclick = async () => { await saveRosterEdit(code, { active: !active }); toast(active ? "Participante removido" : "Restaurado", "ok"); render(); };
+      actTd.appendChild(rmBtn);
+    }
+    tr.appendChild(nameTd); tr.appendChild(claveTd); tr.appendChild(actTd);
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);
+  const wrap = el("div", "matrix"); wrap.appendChild(tbl); card.appendChild(wrap);
+  card.appendChild(el("div", "small muted", "Cambia la clave de cualquiera, agrega o quita participantes. Los administradores no se pueden quitar."));
+  v.appendChild(card);
 }
 
 // ---------- helpers UI ----------
 function wrapLabel(label, node) { const w = el("div", "field"); w.appendChild(el("div", "small muted", label)); w.appendChild(node); return w; }
 function toast(msg, kind) { const t = $("#toast"); t.textContent = msg; t.className = "toast " + (kind || ""); t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
 
+// ---------- cuentas / roster ----------
+function miniModal(title, nodes) {
+  const bg = el("div", "modal-bg");
+  const box = el("div", "modal");
+  box.appendChild(el("h2", null, esc(title)));
+  nodes.forEach(n => box.appendChild(n));
+  const close = el("button", "btn block", "Cerrar");
+  close.onclick = () => bg.remove();
+  box.appendChild(close);
+  bg.appendChild(box);
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  document.body.appendChild(bg);
+  return bg;
+}
+async function saveRosterEdit(code, patch) {
+  const edits = Object.assign({}, S.rosterEdits);
+  edits[code] = Object.assign({}, edits[code], patch);
+  await Store.setRaceMeta("__roster__", { edits });
+}
+function genCode(name) {
+  const used = new Set([...(window.SEASON_DATA.players || []).map(p => p.code), ...Object.keys(S.creds || {}), ...Object.keys(S.rosterEdits || {})]);
+  const base = ((name || "P").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3)) || "P";
+  let i = 1, code; do { code = base + i; i++; } while (used.has(code));
+  return code;
+}
+function changeOwnPassword() {
+  const inp1 = el("input", "input"); inp1.type = "text"; inp1.placeholder = "Nueva clave"; inp1.autocomplete = "off";
+  const inp2 = el("input", "input"); inp2.type = "text"; inp2.placeholder = "Repite la nueva clave"; inp2.autocomplete = "off"; inp2.style.marginTop = "8px";
+  const err = el("div", "small err"); err.style.marginTop = "6px";
+  const save = el("button", "btn primary block", "Guardar clave");
+  const info = el("p", "muted small", `Tu clave actual: <b>${esc(String((S.creds || {})[user] || "—"))}</b>. Pon la que quieras (mínimo 3 caracteres).`);
+  const bg = miniModal("🔑 Cambiar mi clave", [info, inp1, inp2, err, save]);
+  save.onclick = async () => {
+    const a = inp1.value.trim(), b = inp2.value.trim();
+    if (a.length < 3) { err.textContent = "La clave debe tener al menos 3 caracteres."; return; }
+    if (a !== b) { err.textContent = "Las claves no coinciden."; return; }
+    await saveRosterEdit(user, { password: a });
+    toast("Clave actualizada ✔", "ok"); bg.remove();
+  };
+}
+function adminChangePass(code, name) {
+  const inp = el("input", "input"); inp.type = "text"; inp.placeholder = "Nueva clave"; inp.value = String((S.creds || {})[code] || "");
+  const err = el("div", "small err"); err.style.marginTop = "6px";
+  const save = el("button", "btn primary block", "Guardar clave");
+  const bg = miniModal(`🔑 Clave de ${name}`, [inp, err, save]);
+  save.onclick = async () => {
+    const a = inp.value.trim();
+    if (a.length < 3) { err.textContent = "Mínimo 3 caracteres."; return; }
+    await saveRosterEdit(code, { password: a });
+    toast("Clave actualizada ✔", "ok"); bg.remove();
+  };
+}
+
 function showLogin() {
   const m = $("#loginModal"); m.hidden = false;
   const sel = $("#loginSelect"); sel.innerHTML = "";
   S.players.forEach(p => sel.innerHTML += `<option value="${p.code}">${esc(p.fullName)}</option>`);
-  const needPass = USERS && Object.keys(USERS).length > 0;
+  const creds = S.creds || {};
+  const needPass = Object.keys(creds).length > 0;
   const tryLogin = () => {
     const code = sel.value;
     const pass = ($("#loginPass").value || "").trim().toUpperCase();
-    if (needPass && (!USERS[code] || USERS[code].toUpperCase() !== pass)) {
-      $("#loginErr").textContent = "Código incorrecto para ese jugador.";
+    if (needPass && (!creds[code] || String(creds[code]).toUpperCase() !== pass)) {
+      $("#loginErr").textContent = "Clave incorrecta para ese jugador.";
       return;
     }
     user = code; localStorage.setItem("ff1_user", user); $("#loginErr").textContent = ""; m.hidden = true; render();

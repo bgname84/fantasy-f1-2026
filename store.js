@@ -35,12 +35,33 @@
       return m ? Object.assign({}, rc, m) : Object.assign({}, rc);
     });
 
+    // ---- Roster + credenciales (guardado en race_meta bajo "__roster__") ----
+    const rosterEdits = ((overlay.raceMeta || {})["__roster__"] || {}).edits || {};
+    const seedCreds = window.FF1_USERS || {};
+    const players = [];
+    SEED.players.forEach(p => {
+      const e = rosterEdits[p.code] || {};
+      if (e.active === false) return;   // jugador removido
+      players.push({ code: p.code, fullName: e.fullName || p.fullName, shortName: e.shortName || p.shortName });
+    });
+    Object.keys(rosterEdits).forEach(code => {     // participantes agregados
+      const e = rosterEdits[code];
+      if (e.added && e.active !== false && !SEED.players.some(p => p.code === code)) {
+        players.push({ code, fullName: e.fullName || code, shortName: e.shortName || code });
+      }
+    });
+    const creds = {};
+    SEED.players.forEach(p => { if (seedCreds[p.code]) creds[p.code] = seedCreds[p.code]; });
+    Object.keys(rosterEdits).forEach(code => { if (rosterEdits[code].password) creds[code] = rosterEdits[code].password; });
+
     return {
       year: SEED.year,
       pointsSystem: SEED.pointsSystem,
       teams: SEED.teams,
       driverTeam: SEED.driverTeam,
-      players: SEED.players,
+      players,
+      creds,
+      rosterEdits,
       pagos: SEED.pagos,
       calendar,
       picks,
