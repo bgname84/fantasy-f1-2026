@@ -45,7 +45,7 @@
       calendar,
       picks,
       results,
-      payments: Object.assign({}, overlay.payments || {}),
+      payments: Object.assign({}, SEED.payments || {}, overlay.payments || {}),
     };
   }
 

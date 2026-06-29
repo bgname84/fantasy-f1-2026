@@ -245,17 +245,17 @@ function viewTabla(v) {
   const done = scoredRaces();
   const card = el("div", "card");
   const wrap = el("div", "matrix");
-  let h = "<table><thead><tr><th>#</th><th>Jugador</th>";
-  done.forEach(r => h += `<th class="num" title="${esc(r.name)}">R${r.round}${raceSprint(r) ? "ⓢ" : ""}</th>`);
+  let h = '<table class="standings"><thead><tr><th>#</th><th>Jugador</th>';
+  done.forEach(r => h += `<th class="num race-col" title="${esc(r.name)}">R${r.round}${raceSprint(r) ? "ⓢ" : ""}</th>`);
   h += '<th class="num">TOTAL</th></tr></thead><tbody>';
   rows.forEach(r => {
     const me = r.code === user ? " me" : "";
     h += `<tr class="${me.trim()}"><td><span class="rank ${r.place <= 3 ? "r" + r.place : ""}">${r.place}</span></td><td>${esc(r.name)}</td>`;
-    done.forEach(rc => h += `<td class="num">${playerRacePts(rc.name, r.code) || ""}</td>`);
+    done.forEach(rc => h += `<td class="num race-col">${playerRacePts(rc.name, r.code) || ""}</td>`);
     h += `<td class="num"><b>${r.total}</b></td></tr>`;
   });
   h += "</tbody></table>";
-  wrap.innerHTML = h; card.appendChild(wrap);
+  wrap.innerHTML = h; card.appendChild(wrap);   // wrap = .matrix: scroll en escritorio, ajustado en móvil
   card.appendChild(el("div", "legend", '<span>ⓢ = carrera sprint</span><span>Premios: 60% / 30% / 10% del bote</span>'));
   v.appendChild(card);
 }
@@ -490,7 +490,7 @@ function viewResultados(v) {
 
   const sprint = raceSprint(race);
   const wrap = el("div", "matrix");
-  const tbl = el("table");
+  const tbl = el("table", "capture");
   tbl.innerHTML = `<thead><tr><th>Piloto</th><th>Pos</th>${sprint ? "<th>Sprint</th>" : ""}<th>Q✓</th><th>R✓</th><th>DOTD</th><th class="num">Pts</th></tr></thead>`;
   const tb = el("tbody");
   show.forEach(d => {
@@ -501,7 +501,7 @@ function viewResultados(v) {
     const q = `<input type="checkbox" ${res.qBonus ? "checked" : ""}>`;
     const r = `<input type="checkbox" ${res.rBonus ? "checked" : ""}>`;
     const dotd = `<input type="radio" name="dotd_${race.name}" ${res.otd ? "checked" : ""}>`;
-    tr.innerHTML = `<td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(lastName(d))}</b> <span class="small" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>
+    tr.innerHTML = `<td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(lastName(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>
       <td>${posI}</td>${sprint ? `<td>${spI}</td>` : ""}<td>${q}</td><td>${r}</td><td>${dotd}</td><td class="num pts-${cssId(d)}">${driverPoints(res)}</td>`;
     const [posInp, spInp] = tr.querySelectorAll("input.input");
     const [qC, rC] = tr.querySelectorAll('input[type=checkbox]');
@@ -559,7 +559,7 @@ function consultaSection(v) {
   });
   const tot = scored.reduce((s, r) => s + playerRacePts(r.name, code), 0);
   h += `</tbody><tfoot><tr><th>TOTAL</th><th></th><th class="num">${tot}</th></tr></tfoot></table>`;
-  const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
+  const wrap = el("div"); wrap.innerHTML = h; card.appendChild(wrap);   // sin .matrix: la tabla envuelve en móvil
   v.appendChild(card);
 }
 
@@ -595,7 +595,7 @@ function viewPagos(v) {
 }
 
 // ---------- helpers UI ----------
-function wrapLabel(label, node) { const w = el("div"); w.appendChild(el("div", "small muted", label)); w.appendChild(node); return w; }
+function wrapLabel(label, node) { const w = el("div", "field"); w.appendChild(el("div", "small muted", label)); w.appendChild(node); return w; }
 function toast(msg, kind) { const t = $("#toast"); t.textContent = msg; t.className = "toast " + (kind || ""); t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, 2200); }
 
 function showLogin() {

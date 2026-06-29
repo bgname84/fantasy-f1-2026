@@ -3106,5 +3106,91 @@ window.SEASON_DATA = {
    "2": 65520,
    "3": 21840
   }
+ },
+ "payments": {
+  "FV": {
+   "paid": true
+  },
+  "PC": {
+   "paid": true
+  },
+  "EV": {
+   "paid": true
+  },
+  "ANC": {
+   "paid": true
+  },
+  "GYH": {
+   "paid": true
+  },
+  "BG": {
+   "paid": true
+  },
+  "PF": {
+   "paid": true
+  },
+  "IA": {
+   "paid": true
+  },
+  "MR": {
+   "paid": true
+  },
+  "CV": {
+   "paid": true
+  },
+  "SYJ": {
+   "paid": true
+  },
+  "MV": {
+   "paid": true
+  },
+  "JYF": {
+   "paid": true
+  },
+  "MAM": {
+   "paid": true
+  },
+  "LG": {
+   "paid": true
+  },
+  "CM": {
+   "paid": true
+  },
+  "WC": {
+   "paid": true
+  },
+  "DA": {
+   "paid": true
+  },
+  "SS": {
+   "paid": true
+  },
+  "NYG": {
+   "paid": true
+  },
+  "AC": {
+   "paid": true
+  },
+  "JV": {
+   "paid": true
+  },
+  "GD": {
+   "paid": true
+  },
+  "AF": {
+   "paid": true
+  },
+  "SR": {
+   "paid": true
+  },
+  "JR": {
+   "paid": true
+  },
+  "JMF": {
+   "paid": true
+  },
+  "LA": {
+   "paid": true
+  }
  }
 };
