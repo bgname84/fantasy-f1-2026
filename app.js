@@ -486,7 +486,8 @@ function viewPilotos(v) {
 function viewResultados(v) {
   v.appendChild(el("h2", "section", "🧮 Resultados de carrera"));
   if (!admin) {
-    v.appendChild(el("div", "notice", "La captura de resultados es solo del organizador. Abajo puedes consultar los resultados de cualquier jugador."));
+    v.appendChild(el("div", "notice", "La captura es solo del organizador. Aquí puedes consultar los resultados (solo lectura)."));
+    resultsReadOnly(v);
     consultaSection(v);
     return;
   }
@@ -636,6 +637,40 @@ function consultaSection(v) {
   const tot = scored.reduce((s, r) => s + playerRacePts(r.name, code), 0);
   h += `</tbody><tfoot><tr><th>TOTAL</th><th></th><th class="num">${tot}</th></tr></tfoot></table>`;
   const wrap = el("div"); wrap.innerHTML = h; card.appendChild(wrap);   // sin .matrix: la tabla envuelve en móvil
+  v.appendChild(card);
+}
+
+// ---------- desglose por piloto de una carrera (solo lectura, para jugadores) ----------
+function resultsReadOnly(v) {
+  const scored = scoredRaces();
+  if (!scored.length) { v.appendChild(el("div", "notice", "Aún no hay resultados de ninguna carrera.")); return; }
+  const card = el("div", "card");
+  card.appendChild(el("h2", "section", "🏁 Puntos por piloto (por carrera)"));
+  if (!ui.resViewRace || !scored.find(r => r.name === ui.resViewRace)) ui.resViewRace = scored[scored.length - 1].name;
+  const sel = el("select", "sel");
+  scored.forEach(r => sel.innerHTML += `<option value="${r.name}" ${r.name === ui.resViewRace ? "selected" : ""}>R${r.round} · ${esc(r.name)}${raceSprint(r) ? " (sprint)" : ""}</option>`);
+  sel.onchange = () => { ui.resViewRace = sel.value; render(); };
+  const bar = el("div", "row"); bar.appendChild(wrapLabel("Carrera", sel));
+  bar.appendChild(el("div", "small muted", "Solo lectura"));
+  card.appendChild(bar);
+
+  const race = scored.find(r => r.name === ui.resViewRace);
+  const sprint = raceSprint(race);
+  const res = S.results[race.name] || {};
+  const drivers = Object.keys(res).sort((a, b) => driverPoints(res[b]) - driverPoints(res[a]));
+  const chk = x => x ? "✓" : "";
+  let h = `<table class="capture"><thead><tr><th>Piloto</th><th>Pos</th>${sprint ? "<th>Spr</th>" : ""}<th>Q</th><th>R</th><th>DOTD</th><th class="num">Pts</th></tr></thead><tbody>`;
+  drivers.forEach(d => {
+    const x = res[d];
+    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(lastName(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
+      + `<td>${x.position != null ? esc(String(x.position)) : ""}</td>`
+      + (sprint ? `<td>${x.sprintPos || ""}</td>` : "")
+      + `<td class="ok">${chk(x.qBonus)}</td><td class="ok">${chk(x.rBonus)}</td><td style="color:var(--gold)">${chk(x.otd)}</td>`
+      + `<td class="num"><b>${driverPoints(x)}</b></td></tr>`;
+  });
+  h += "</tbody></table>";
+  const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
+  card.appendChild(el("div", "legend", '<span>Pos = posición final</span><span>Q = calificó mejor que su compañero</span><span>R = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
   v.appendChild(card);
 }
 
