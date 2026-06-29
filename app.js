@@ -417,7 +417,11 @@ function viewPilotos(v) {
 // ---------- RESULTADOS (admin) ----------
 function viewResultados(v) {
   v.appendChild(el("h2", "section", "🧮 Resultados de carrera"));
-  if (!admin) { v.appendChild(el("div", "notice", "Solo el organizador (admin) puede capturar resultados. Usa el botón “🔧 admin” arriba a la derecha.")); return; }
+  if (!admin) {
+    v.appendChild(el("div", "notice", "La captura de resultados es solo del organizador. Abajo puedes consultar los resultados de cualquier jugador."));
+    consultaSection(v);
+    return;
+  }
 
   const races = S.calendar.filter(r => r.status !== "cancelled");
   if (!ui.resRace || !races.find(r => r.name === ui.resRace)) ui.resRace = (editableRaces()[0] || races[0]).name;
@@ -482,7 +486,7 @@ function viewResultados(v) {
   hd.appendChild(loadBtn); hd.appendChild(tgl); card.appendChild(hd);
   card.appendChild(el("div", "small muted", "“Cargar resultados oficiales” trae posiciones, sprint y bonos de coequipero desde la F1 (re-ejecutable si hay cambios). El <b>Driver of the Day</b> y cualquier ajuste se ponen a mano abajo."));
 
-  if (!show.length) { card.appendChild(el("div", "notice", "Aún nadie eligió pilotos para esta carrera.")); v.appendChild(card); return; }
+  if (!show.length) { card.appendChild(el("div", "notice", "Aún nadie eligió pilotos para esta carrera.")); v.appendChild(card); consultaSection(v); return; }
 
   const sprint = raceSprint(race);
   const wrap = el("div", "matrix");
@@ -528,8 +532,36 @@ function viewResultados(v) {
   tbl.appendChild(tb); wrap.appendChild(tbl); card.appendChild(wrap);
   card.appendChild(el("div", "legend", '<span>Pos = posición final (número, o DNF/DNS/DSQ)</span><span>Q✓ = calificó mejor que su compañero</span><span>R✓ = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
   v.appendChild(card);
+  consultaSection(v);
 }
 function cssId(s) { return String(s).replace(/[^a-z0-9]/gi, ""); }
+
+// ---------- consulta de resultados de cualquier jugador (solo lectura) ----------
+function consultaSection(v) {
+  const card = el("div", "card");
+  card.appendChild(el("h2", "section", "📋 Consultar resultados de jugadores"));
+  const code = (ui.consultaPlayer && S.players.find(p => p.code === ui.consultaPlayer)) ? ui.consultaPlayer : user;
+  const sel = el("select", "sel");
+  S.players.forEach(p => sel.innerHTML += `<option value="${p.code}" ${p.code === code ? "selected" : ""}>${esc(p.fullName)}</option>`);
+  sel.onchange = () => { ui.consultaPlayer = sel.value; render(); };
+  const bar = el("div", "row");
+  bar.appendChild(wrapLabel("Ver jugador", sel));
+  bar.appendChild(el("div", "small muted", "Solo lectura · carreras ya corridas"));
+  card.appendChild(bar);
+  const scored = scoredRaces();
+  let h = '<table class="hist"><thead><tr><th>Carrera</th><th>Pilotos (pts c/u)</th><th class="num">Pts</th></tr></thead><tbody>';
+  scored.forEach(r => {
+    const pk = picksOf(r.name, code);
+    const det = pk.length
+      ? pk.map(d => `${esc(d)} <span class="muted">(${driverPoints(S.results[r.name] && S.results[r.name][d])})</span>`).join(", ")
+      : '<span class="muted">— sin selección —</span>';
+    h += `<tr><td>R${r.round} ${esc(r.name)}</td><td>${det}</td><td class="num">${playerRacePts(r.name, code) || 0}</td></tr>`;
+  });
+  const tot = scored.reduce((s, r) => s + playerRacePts(r.name, code), 0);
+  h += `</tbody><tfoot><tr><th>TOTAL</th><th></th><th class="num">${tot}</th></tr></tfoot></table>`;
+  const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
+  v.appendChild(card);
+}
 
 // ---------- PAGOS ----------
 function viewPagos(v) {

@@ -192,107 +192,107 @@ window.SEASON_DATA = {
   {
    "round": 10,
    "name": "AUSTRIA",
-   "status": "upcoming",
+   "status": "done",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 11,
    "name": "INGLATERRA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 12,
    "name": "BELGICA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 13,
    "name": "HUNGRIA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 14,
    "name": "HOLANDA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 15,
    "name": "ITALIA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 16,
    "name": "ESPAÑA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 17,
    "name": "BAKU",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 18,
    "name": "SINGAPORE",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 19,
    "name": "USA",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 20,
    "name": "MEXICO",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 21,
    "name": "BRAZIL",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 22,
    "name": "LAS VEGAS",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 23,
    "name": "QATAR",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   },
   {
    "round": 24,
    "name": "ABU DHABI",
    "status": "upcoming",
    "sprint": false,
-   "driversRequired": 3
+   "driversRequired": 4
   }
  ],
  "players": [
@@ -1484,7 +1484,7 @@ window.SEASON_DATA = {
     "sprintPts": 0,
     "qBonus": 1,
     "rBonus": 1,
-    "otd": 0
+    "otd": 1
    },
    "Oscar Piastri": {
     "position": 5,
@@ -1592,6 +1592,206 @@ window.SEASON_DATA = {
     "sprintPts": 0,
     "qBonus": 1,
     "rBonus": 1,
+    "otd": 0
+   }
+  },
+  "AUSTRIA": {
+   "Oscar Piastri": {
+    "position": 4,
+    "pts": 12,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Liam Lawson": {
+    "position": 9,
+    "pts": 2,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Gabriel Bortoleto": {
+    "position": 11,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Lance Stroll": {
+    "position": "DNF",
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "George Russell": {
+    "position": 1,
+    "pts": 25,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Max Verstappen": {
+    "position": 2,
+    "pts": 18,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 1
+   },
+   "Andrea Antonelli": {
+    "position": 3,
+    "pts": 15,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Carlos Sainz": {
+    "position": "DNF",
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Isack Hadjar": {
+    "position": 6,
+    "pts": 8,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Alexander Albon": {
+    "position": 17,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Fernando Alonso": {
+    "position": 18,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Franco Colapinto": {
+    "position": 15,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Lando Norris": {
+    "position": 7,
+    "pts": 6,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Esteban Ocon": {
+    "position": 16,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Nico Hulkenberg": {
+    "position": 12,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Pierre Gasly": {
+    "position": 13,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Charles Leclerc": {
+    "position": 8,
+    "pts": 4,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Sergio Perez": {
+    "position": "DNF",
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Lewis Hamilton": {
+    "position": 5,
+    "pts": 10,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Valtteri Bottas": {
+    "position": "DNF",
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
+    "otd": 0
+   },
+   "Oliver Bearman": {
+    "position": 14,
+    "pts": 0,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 1,
+    "rBonus": 1,
+    "otd": 0
+   },
+   "Arvid Lindblad": {
+    "position": 10,
+    "pts": 1,
+    "sprintPos": 0,
+    "sprintPts": 0,
+    "qBonus": 0,
+    "rBonus": 0,
     "otd": 0
    }
   }
@@ -2730,6 +2930,170 @@ window.SEASON_DATA = {
     "Alexander Albon",
     "Liam Lawson",
     "Pierre Gasly"
+   ]
+  },
+  "AUSTRIA": {
+   "FV": [
+    "Oscar Piastri",
+    "Liam Lawson",
+    "Gabriel Bortoleto",
+    "Lance Stroll"
+   ],
+   "PC": [
+    "George Russell",
+    "Max Verstappen",
+    "Oscar Piastri",
+    "Liam Lawson"
+   ],
+   "EV": [
+    "Andrea Antonelli",
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Gabriel Bortoleto"
+   ],
+   "ANC": [
+    "Isack Hadjar",
+    "Alexander Albon",
+    "Oscar Piastri",
+    "Liam Lawson"
+   ],
+   "GYH": [
+    "Fernando Alonso",
+    "Alexander Albon",
+    "Liam Lawson",
+    "Franco Colapinto"
+   ],
+   "BG": [
+    "Isack Hadjar",
+    "Lance Stroll",
+    "Carlos Sainz",
+    "Liam Lawson"
+   ],
+   "PF": [
+    "Lando Norris",
+    "Liam Lawson",
+    "Esteban Ocon",
+    "Nico Hulkenberg"
+   ],
+   "IA": [
+    "Andrea Antonelli",
+    "Liam Lawson",
+    "Esteban Ocon",
+    "Gabriel Bortoleto"
+   ],
+   "MR": [
+    "Isack Hadjar",
+    "Oscar Piastri",
+    "Liam Lawson",
+    "Pierre Gasly"
+   ],
+   "CV": [
+    "Charles Leclerc",
+    "Esteban Ocon",
+    "Gabriel Bortoleto",
+    "Sergio Perez"
+   ],
+   "SYJ": [
+    "Carlos Sainz",
+    "Esteban Ocon",
+    "Nico Hulkenberg",
+    "Sergio Perez"
+   ],
+   "MV": [
+    "Lewis Hamilton",
+    "Franco Colapinto",
+    "Nico Hulkenberg",
+    "Sergio Perez"
+   ],
+   "JYF": [
+    "George Russell",
+    "Isack Hadjar",
+    "Alexander Albon",
+    "Valtteri Bottas"
+   ],
+   "MAM": [
+    "Isack Hadjar",
+    "Charles Leclerc",
+    "Lance Stroll",
+    "Lando Norris"
+   ],
+   "LG": [
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Esteban Ocon",
+    "Pierre Gasly"
+   ],
+   "CM": [
+    "Fernando Alonso",
+    "Liam Lawson",
+    "Esteban Ocon",
+    "Sergio Perez"
+   ],
+   "WC": [
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Oliver Bearman",
+    "Sergio Perez"
+   ],
+   "DA": [
+    "George Russell",
+    "Lewis Hamilton",
+    "Fernando Alonso",
+    "Oscar Piastri"
+   ],
+   "SS": [
+    "George Russell",
+    "Isack Hadjar",
+    "Lewis Hamilton",
+    "Oscar Piastri"
+   ],
+   "NYG": [
+    "Isack Hadjar",
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Gabriel Bortoleto"
+   ],
+   "AC": [
+    "Oscar Piastri",
+    "Liam Lawson",
+    "Franco Colapinto",
+    "Gabriel Bortoleto"
+   ],
+   "JV": [
+    "Max Verstappen",
+    "Lance Stroll",
+    "Oscar Piastri",
+    "Liam Lawson"
+   ],
+   "AF": [
+    "Arvid Lindblad",
+    "Esteban Ocon",
+    "Franco Colapinto",
+    "Valtteri Bottas"
+   ],
+   "SR": [
+    "Lewis Hamilton",
+    "Liam Lawson",
+    "Oliver Bearman",
+    "Franco Colapinto"
+   ],
+   "JR": [
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Oliver Bearman",
+    "Sergio Perez"
+   ],
+   "JMF": [
+    "Carlos Sainz",
+    "Liam Lawson",
+    "Esteban Ocon",
+    "Franco Colapinto"
+   ],
+   "LA": [
+    "George Russell",
+    "Max Verstappen",
+    "Lewis Hamilton",
+    "Lando Norris"
    ]
   }
  },
