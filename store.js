@@ -38,10 +38,11 @@
     // ---- Roster + credenciales (guardado en race_meta bajo "__roster__") ----
     const rosterEdits = ((overlay.raceMeta || {})["__roster__"] || {}).edits || {};
     const seedCreds = window.FF1_USERS || {};
+    const admins = (window.FF1_CONFIG && window.FF1_CONFIG.ADMINS) || [];
     const players = [];
     SEED.players.forEach(p => {
       const e = rosterEdits[p.code] || {};
-      if (e.active === false) return;   // jugador removido
+      if (e.active === false && admins.indexOf(p.code) === -1) return;   // removido (admins nunca se remueven)
       players.push({ code: p.code, fullName: e.fullName || p.fullName, shortName: e.shortName || p.shortName });
     });
     Object.keys(rosterEdits).forEach(code => {     // participantes agregados
@@ -72,6 +73,16 @@
 
   function emptyOverlay() {
     return { picks: {}, results: {}, raceMeta: {}, payments: {} };
+  }
+
+  // merge de race_meta; para el roster (__roster__) funde edits POR CÓDIGO (evita pisar cambios concurrentes)
+  function mergeMeta(cur, data) {
+    const out = Object.assign({}, cur, data);
+    if (data && data.edits) {
+      out.edits = Object.assign({}, cur && cur.edits);
+      for (const c in data.edits) out.edits[c] = Object.assign({}, out.edits[c], data.edits[c]);
+    }
+    return out;
   }
 
   // ---------------- Local adapter ----------------
@@ -108,7 +119,7 @@
         if (overlay.results[race]) { delete overlay.results[race][driver]; save(); }
       },
       async setRaceMeta(race, data) {
-        overlay.raceMeta[race] = Object.assign({}, overlay.raceMeta[race], data); save();
+        overlay.raceMeta[race] = mergeMeta(overlay.raceMeta[race], data); save();
       },
       async setPayment(player, data) {
         overlay.payments[player] = Object.assign({}, overlay.payments[player], data); save();
@@ -174,8 +185,9 @@
         await sb.from("results").delete().match({ race, driver }); await pull(); listeners.forEach(f => f());
       },
       async setRaceMeta(race, data) {
+        if (data && data.edits) await pull();   // roster: leer lo más fresco antes de fundir por-código
         const cur = overlay.raceMeta[race] || {};
-        await sb.from("race_meta").upsert({ race, data: Object.assign({}, cur, data) });
+        await sb.from("race_meta").upsert({ race, data: mergeMeta(cur, data) });
         await pull(); listeners.forEach(f => f());
       },
       async setPayment(player, data) {

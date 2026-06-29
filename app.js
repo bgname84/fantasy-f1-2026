@@ -735,7 +735,7 @@ function viewGestionParticipantes(v) {
   const passI = el("input", "input"); passI.placeholder = "Clave de acceso";
   const addBtn = el("button", "btn primary", "➕ Agregar");
   addBtn.onclick = async () => {
-    const name = nameI.value.trim(), pass = passI.value.trim();
+    const name = nameI.value.trim(), pass = normPass(passI.value);
     if (name.length < 2) { toast("Escribe el nombre", "err"); return; }
     if (pass.length < 3) { toast("La clave debe tener al menos 3 caracteres", "err"); return; }
     const code = genCode(name);
@@ -771,7 +771,14 @@ function viewGestionParticipantes(v) {
     } else {
       const rmBtn = el("button", "btn"); rmBtn.style.marginLeft = "6px";
       rmBtn.textContent = active ? "🗑️ quitar" : "♻️ restaurar";
-      rmBtn.onclick = async () => { await saveRosterEdit(code, { active: !active }); toast(active ? "Participante removido" : "Restaurado", "ok"); render(); };
+      rmBtn.onclick = async () => {
+        if (active) {
+          const hasHistory = S.calendar.some(r => (S.picks[r.name] || {})[code]) || (S.payments[code] || {}).paid;
+          if (hasHistory && !(await confirmModal(`${name} tiene participación registrada (picks o pago). Si lo quitas, desaparecerá de la tabla y del bote. ¿Continuar?`))) return;
+        }
+        await saveRosterEdit(code, { active: !active });
+        toast(active ? "Participante removido" : "Restaurado", "ok"); render();
+      };
       actTd.appendChild(rmBtn);
     }
     tr.appendChild(nameTd); tr.appendChild(claveTd); tr.appendChild(actTd);
@@ -802,10 +809,10 @@ function miniModal(title, nodes) {
   return bg;
 }
 async function saveRosterEdit(code, patch) {
-  const edits = Object.assign({}, S.rosterEdits);
-  edits[code] = Object.assign({}, edits[code], patch);
-  await Store.setRaceMeta("__roster__", { edits });
+  // solo el patch de este código; el store funde por-código (evita pisar cambios concurrentes)
+  await Store.setRaceMeta("__roster__", { edits: { [code]: patch } });
 }
+const normPass = s => String(s || "").trim().toUpperCase();   // misma normalización que el login
 function genCode(name) {
   const used = new Set([...(window.SEASON_DATA.players || []).map(p => p.code), ...Object.keys(S.creds || {}), ...Object.keys(S.rosterEdits || {})]);
   const base = ((name || "P").replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3)) || "P";
@@ -820,7 +827,7 @@ function changeOwnPassword() {
   const info = el("p", "muted small", `Tu clave actual: <b>${esc(String((S.creds || {})[user] || "—"))}</b>. Pon la que quieras (mínimo 3 caracteres).`);
   const bg = miniModal("🔑 Cambiar mi clave", [info, inp1, inp2, err, save]);
   save.onclick = async () => {
-    const a = inp1.value.trim(), b = inp2.value.trim();
+    const a = normPass(inp1.value), b = normPass(inp2.value);
     if (a.length < 3) { err.textContent = "La clave debe tener al menos 3 caracteres."; return; }
     if (a !== b) { err.textContent = "Las claves no coinciden."; return; }
     await saveRosterEdit(user, { password: a });
@@ -833,11 +840,27 @@ function adminChangePass(code, name) {
   const save = el("button", "btn primary block", "Guardar clave");
   const bg = miniModal(`🔑 Clave de ${name}`, [inp, err, save]);
   save.onclick = async () => {
-    const a = inp.value.trim();
+    const a = normPass(inp.value);
     if (a.length < 3) { err.textContent = "Mínimo 3 caracteres."; return; }
     await saveRosterEdit(code, { password: a });
     toast("Clave actualizada ✔", "ok"); bg.remove();
   };
+}
+// confirmación modal (promesa)
+function confirmModal(msg) {
+  return new Promise(resolve => {
+    const bg = el("div", "modal-bg");
+    const box = el("div", "modal");
+    box.appendChild(el("h2", null, "Confirmar"));
+    box.appendChild(el("p", "muted small", esc(msg)));
+    const yes = el("button", "btn primary block", "Sí, continuar");
+    const no = el("button", "btn block", "Cancelar");
+    const done = v => { bg.remove(); resolve(v); };
+    yes.onclick = () => done(true); no.onclick = () => done(false);
+    box.appendChild(yes); box.appendChild(no);
+    bg.appendChild(box); bg.onclick = e => { if (e.target === bg) done(false); };
+    document.body.appendChild(bg);
+  });
 }
 
 function showLogin() {
@@ -845,12 +868,11 @@ function showLogin() {
   const sel = $("#loginSelect"); sel.innerHTML = "";
   S.players.forEach(p => sel.innerHTML += `<option value="${p.code}">${esc(p.fullName)}</option>`);
   const creds = S.creds || {};
-  const needPass = Object.keys(creds).length > 0;
-  const tryLogin = () => {
+  const tryLogin = () => {                                  // falla-cerrado: siempre exige clave válida
     const code = sel.value;
     const pass = ($("#loginPass").value || "").trim().toUpperCase();
-    if (needPass && (!creds[code] || String(creds[code]).toUpperCase() !== pass)) {
-      $("#loginErr").textContent = "Clave incorrecta para ese jugador.";
+    if (!creds[code] || String(creds[code]).toUpperCase() !== pass) {
+      $("#loginErr").textContent = creds[code] ? "Clave incorrecta para ese jugador." : "Ese jugador no tiene clave configurada. Avisa al organizador.";
       return;
     }
     user = code; localStorage.setItem("ff1_user", user); $("#loginErr").textContent = ""; m.hidden = true; render();
