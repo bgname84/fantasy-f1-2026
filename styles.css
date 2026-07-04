@@ -203,3 +203,86 @@ table.breakdown td{padding:7px 8px}
   .capture input.input{width:48px!important}
   .capture input[type=checkbox],.capture input[type=radio]{width:20px;height:20px}
 }
+
+/* ================= V2 ================= */
+.vbadge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;
+  padding:1px 7px;border-radius:20px;vertical-align:middle;margin-left:6px;letter-spacing:1px;font-style:normal}
+
+/* transiciones suaves */
+.card,.teamcard,.btn,.drv,.pod,tbody tr{transition:background .15s ease,border-color .15s ease,transform .12s ease,box-shadow .15s ease}
+.btn:active{transform:scale(.97)}
+.drv:not(.disabled):active{transform:scale(.985)}
+.card:hover{border-color:#343a48}
+
+/* podio renovado */
+.pod{position:relative;background:linear-gradient(180deg,#1d2029,#15171f)}
+.pod .pos{letter-spacing:1.5px;text-transform:uppercase;font-weight:700;font-size:11px}
+.pod.p1{box-shadow:0 8px 30px rgba(255,210,74,.12)}
+.pod.p1 .pts{color:var(--gold)}
+.pod.p2 .pts{color:var(--silver)}
+.pod.p3 .pts{color:var(--bronze)}
+
+/* gráfica de evolución */
+.chartwrap{overflow-x:auto}
+.chartwrap svg{display:block;min-width:520px;width:100%;height:auto}
+.chartlegend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+.chartlegend span{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+.chartlegend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.chartlegend .me-l{color:var(--txt);font-weight:700}
+
+/* “ya enviaron” */
+.sentgrid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.sentchip{font-size:12px;padding:3px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.sentchip.yes{border-color:var(--green);color:var(--green)}
+.sentchip.me{border-color:var(--red);color:var(--txt);font-weight:700}
+.progressbar{height:8px;border-radius:6px;background:var(--panel2);overflow:hidden;margin-top:8px}
+.progressbar i{display:block;height:100%;background:linear-gradient(90deg,var(--red),#ff5c46);border-radius:6px;transition:width .4s ease}
+
+/* stats pills */
+.statrow{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.statpill{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:100px}
+.statpill .k{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.statpill .v{font-size:16px;font-weight:800;margin-top:2px}
+.statpill .v .small{font-weight:600}
+
+/* nav inferior tipo app en móvil */
+.tabs .ti{display:none}
+@media(max-width:560px){
+  .tabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:40;margin:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom));
+    background:#15171f;border-top:1px solid var(--line);display:flex;justify-content:space-around;gap:0;overflow-x:visible}
+  .tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:10px;font-style:normal}
+  .tabs .ti{display:block;font-size:19px;line-height:1.1}
+  .tabs .tl{font-size:9.5px;letter-spacing:.2px;font-weight:700}
+  .tabs button.active{box-shadow:none;background:rgba(225,6,0,.14)}
+  .tabs button.active .tl{color:var(--red)}
+  main{padding-bottom:76px}          /* espacio para la barra inferior */
+  .toast{bottom:84px}
+}
+
+/* ===== v2.1: barra de selección arriba + pulido sencillo ===== */
+/* barra "Seleccionados / Guardar" pegajosa arriba del cuadro de pilotos */
+.actionsbar{position:sticky;top:54px;z-index:15;background:#1a1d26;border-color:#3a3f4d;
+  box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.actionsbar .ok{color:var(--green)}
+@media(max-width:560px){ .actionsbar{top:6px} }   /* en móvil las pestañas van abajo */
+
+/* tarjetas y botones más suaves y limpios */
+.card{border-radius:16px}
+.teamcard{border-radius:14px}
+.btn{border-radius:12px}
+.btn.primary{box-shadow:0 4px 14px rgba(225,6,0,.25)}
+.btn.primary:disabled{box-shadow:none}
+.input,.big-select,select.sel{border-radius:12px}
+
+/* pips de uso más visibles */
+.pip{width:10px;height:10px}
+
+/* fila de piloto elegida: palomita clara */
+.drv.picked .dn::after{content:" ✓";color:var(--tc);font-weight:800}
+
+/* podio más limpio */
+.pod{border-radius:14px}
+.pod .prize{font-size:13px}
+
+/* menos ruido de fondo */
+body{background-image:radial-gradient(1100px 460px at 80% -10%,rgba(225,6,0,.08),transparent 60%)}

@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#e10600">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Fantasy F1 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,11 +25,11 @@
 </header>
 
 <nav class="tabs" id="tabs">
-  <button data-tab="tabla" class="active">🏆 Tabla</button>
-  <button data-tab="equipo">🏎️ Mi equipo</button>
-  <button data-tab="pilotos">📊 Pilotos</button>
-  <button data-tab="resultados">🧮 Resultados</button>
-  <button data-tab="pagos">💵 Pagos</button>
+  <button data-tab="tabla" class="active"><span class="ti">🏆</span><span class="tl">Tabla</span></button>
+  <button data-tab="equipo"><span class="ti">🏎️</span><span class="tl">Mi equipo</span></button>
+  <button data-tab="pilotos"><span class="ti">📊</span><span class="tl">Pilotos</span></button>
+  <button data-tab="resultados"><span class="ti">🧮</span><span class="tl">Resultados</span></button>
+  <button data-tab="pagos"><span class="ti">💵</span><span class="tl">Pagos</span></button>
 </nav>
 
 <main id="view"></main>
@@ -35,12 +38,12 @@
 <div class="modal-bg" id="loginModal" hidden>
   <div class="modal">
     <h2>¿Quién eres?</h2>
-    <p class="muted">Elige tu nombre e ingresa tu código para gestionar tus pilotos.</p>
+    <p class="muted">Elige tu nombre e ingresa tu clave para gestionar tus pilotos.</p>
     <select id="loginSelect" class="big-select"></select>
-    <input type="text" id="loginPass" placeholder="Tu código (ej. AB12)" class="input" autocomplete="off" style="margin-top:10px;text-transform:uppercase">
+    <input type="text" id="loginPass" placeholder="Tu clave" class="input" autocomplete="off" style="margin-top:10px;text-transform:uppercase">
     <div id="loginErr" class="small err" style="margin-top:6px"></div>
     <button class="btn primary block" id="loginBtn">Entrar</button>
-    <p class="muted small" style="margin-top:12px">El organizador entra con su propio nombre y código (tiene admin automático).</p>
+    <p class="muted small" style="margin-top:12px">El organizador entra con su propio nombre y clave (tiene admin automático).</p>
   </div>
 </div>
 

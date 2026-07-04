@@ -296,10 +296,78 @@ function renderWho() {
   };
 }
 
+// ---------- v2: quién ya envió su selección ----------
+function sentCard(v) {
+  const next = S.calendar.find(x => x.status === "upcoming");
+  if (!next) return;
+  const sent = S.players.filter(p => picksOf(next.name, p.code).length > 0);
+  const locked = isLockedForPlayers(next);
+  const card = el("div", "card");
+  card.innerHTML = `<b>📨 Selecciones para R${next.round} · ${esc(next.name)}</b>
+    <span class="muted small"> ${sent.length}/${S.players.length} enviadas${locked ? ' · <span class="err">inscripción cerrada</span>' : ""}</span>`;
+  const bar = el("div", "progressbar");
+  bar.innerHTML = `<i style="width:${Math.round(sent.length / Math.max(1, S.players.length) * 100)}%"></i>`;
+  card.appendChild(bar);
+  const grid = el("div", "sentgrid");
+  S.players.forEach(p => {
+    const has = picksOf(next.name, p.code).length > 0;
+    grid.appendChild(el("span", "sentchip" + (has ? " yes" : "") + (p.code === user ? " me" : ""), `${has ? "✓ " : ""}${esc(p.shortName)}`));
+  });
+  card.appendChild(grid);
+  card.appendChild(el("div", "small muted", "Solo se muestra quién ya envió — los pilotos elegidos no se revelan hasta después de la carrera."));
+  v.appendChild(card);
+}
+
+// ---------- v2: gráfica de evolución de puntos ----------
+function evolutionChart(v) {
+  const races = scoredRaces();
+  if (races.length < 2) return;
+  const rows = standings();
+  const top = rows.slice(0, 5).map(r => r.code);
+  const userInTop = top.includes(user);
+  if (user && !userInTop) top.push(user);
+  const series = top.map(code => {
+    let acc = 0;
+    return { code, name: shortName(code), pts: races.map(r => (acc += playerRacePts(r.name, code))) };
+  });
+  const COLORS = ["#ffd24a", "#c9d2dc", "#d9a06b", "#64c4ff", "#ff87bc", "#27f4d2"];
+  const colorOf = (s, i) => s.code === user ? "#e10600" : COLORS[i % COLORS.length];
+  const W = 640, H = 300, PL = 42, PB = 26, PT = 12, PR = 16;
+  const maxY = Math.max(1, ...series.map(s => s.pts[s.pts.length - 1])) * 1.06;
+  const x = i => PL + i * (W - PL - PR) / Math.max(1, races.length - 1);
+  const y = val => H - PB - (val / maxY) * (H - PB - PT);
+  let g = "";
+  for (let i = 0; i <= 4; i++) {
+    const val = Math.round(maxY / 4 * i);
+    g += `<line x1="${PL}" y1="${y(val)}" x2="${W - PR}" y2="${y(val)}" stroke="#2a2e3a" stroke-width="1"/>`
+      + `<text x="${PL - 6}" y="${y(val) + 4}" fill="#9aa1b0" font-size="10" text-anchor="end">${val}</text>`;
+  }
+  races.forEach((r, i) => { g += `<text x="${x(i)}" y="${H - 8}" fill="#9aa1b0" font-size="10" text-anchor="middle">R${r.round}</text>`; });
+  series.forEach((s, si) => {
+    const col = colorOf(s, si);
+    const pts = s.pts.map((val, i) => `${x(i)},${y(val)}`).join(" ");
+    g += `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${s.code === user ? 3 : 2}" stroke-linejoin="round" stroke-linecap="round"/>`
+      + `<circle cx="${x(s.pts.length - 1)}" cy="${y(s.pts[s.pts.length - 1])}" r="3.5" fill="${col}"/>`;
+  });
+  const card = el("div", "card");
+  card.appendChild(el("h2", "section", "📈 Evolución de puntos"));
+  const wrap = el("div", "chartwrap");
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">${g}</svg>`;
+  card.appendChild(wrap);
+  const leg = el("div", "chartlegend");
+  series.forEach((s, si) => {
+    leg.innerHTML += `<span class="${s.code === user ? "me-l" : ""}"><i style="background:${colorOf(s, si)}"></i>${esc(s.name)}${s.code === user ? " (tú)" : ""}</span>`;
+  });
+  card.appendChild(leg);
+  card.appendChild(el("div", "small muted", `Puntos acumulados del top 5${user && !userInTop ? " y tú" : ""}, carrera por carrera.`));
+  v.appendChild(card);
+}
+
 // ---------- TABLA ----------
 function viewTabla(v) {
   const rows = standings(), pz = prizes();
   v.appendChild(countdownBanner());
+  sentCard(v);
   v.appendChild(el("h2", "section", `🏆 Tabla general · ${scoredRaces().length} carreras corridas`));
 
   // podio
@@ -332,6 +400,7 @@ function viewTabla(v) {
   wrap.innerHTML = h; card.appendChild(wrap);   // wrap = .matrix: scroll en escritorio, ajustado en móvil
   card.appendChild(el("div", "legend", '<span>ⓢ = carrera sprint</span><span>Premios: 60% / 30% / 10% del bote</span>'));
   v.appendChild(card);
+  evolutionChart(v);
 }
 
 // ---------- MI EQUIPO ----------
@@ -409,26 +478,29 @@ function viewEquipo(v) {
       grid.appendChild(tc);
     });
   }
-  const actions = el("div", "card");
+  const actions = el("div", "card actionsbar");
   function updateBar() {
     const ok = pending.length === req;
-    actions.innerHTML = `<div class="row"><div>Seleccionados: <b>${pending.length}/${req}</b>
-      ${pending.length ? "· " + pending.map(esc).join(", ") : ""}</div><div class="spacer"></div></div>`;
+    actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${ok ? "ok" : ""}">${pending.length}/${req}</b>
+      ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(lastName(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
-      const save = el("button", "btn primary", "Guardar selección");
+      const save = el("button", "btn primary", ok ? "✓ Guardar selección" : "Guardar selección");
       save.disabled = !ok;
       save.onclick = async () => {
         await Store.setPicks(race.name, targetPlayer, pending);
         toast("Selección guardada ✔", "ok");
       };
       actions.querySelector(".row").appendChild(save);
-      if (!ok) actions.appendChild(el("div", "small warn", `Debes elegir exactamente ${req} pilotos.`));
+      if (!ok) {
+        const falta = req - pending.length;
+        actions.appendChild(el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
+      }
     } else {
       actions.appendChild(el("div", "small muted", "⏱️ Inscripción cerrada — ya no puedes modificar tus pilotos. Solo el administrador puede hacer cambios."));
     }
   }
+  updateBar(); v.appendChild(actions);   // barra ARRIBA del cuadro de pilotos (y pegajosa al hacer scroll)
   redraw(); v.appendChild(grid);
-  updateBar(); v.appendChild(actions);
   showHistory(v, targetPlayer);
 }
 
@@ -633,6 +705,27 @@ function consultaSection(v) {
   card.appendChild(bar);
 
   const scored = scoredRaces();
+
+  // v2: estadísticas del jugador
+  const played = scored.filter(r => picksOf(r.name, code).length);
+  if (played.length) {
+    const per = played.map(r => ({ race: r, p: playerRacePts(r.name, code) || 0 }));
+    const best = per.reduce((a, b) => (b.p > a.p ? b : a));
+    const totalP = per.reduce((s, x) => s + x.p, 0);
+    const cnt = {};
+    played.forEach(r => picksOf(r.name, code).forEach(d => cnt[d] = (cnt[d] || 0) + 1));
+    const fav = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d, c]) => `${esc(lastName(d))} ×${c}`).join(", ");
+    const place = standings().find(r => r.code === code);
+    const stat = el("div", "statrow");
+    stat.innerHTML = `
+      <div class="statpill"><div class="k">Lugar</div><div class="v">${place ? place.place + "°" : "—"}</div></div>
+      <div class="statpill"><div class="k">Total</div><div class="v">${totalP}</div></div>
+      <div class="statpill"><div class="k">Promedio</div><div class="v">${(totalP / played.length).toFixed(1)}<span class="small muted"> pts</span></div></div>
+      <div class="statpill"><div class="k">Mejor carrera</div><div class="v">${best.p}<span class="small muted"> · ${esc(best.race.name)}</span></div></div>
+      <div class="statpill"><div class="k">Más usados</div><div class="v" style="font-size:13px">${fav || "—"}</div></div>`;
+    card.appendChild(stat);
+  }
+
   const chk = x => x ? "✓" : "";
   let h = '<table class="capture breakdown"><thead><tr><th>Piloto</th><th>Pos</th><th>Spr</th><th>Q</th><th>R</th><th>DOTD</th><th class="num">Pts</th></tr></thead><tbody>';
   let grand = 0, any = false;
