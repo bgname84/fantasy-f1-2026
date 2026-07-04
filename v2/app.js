@@ -478,26 +478,29 @@ function viewEquipo(v) {
       grid.appendChild(tc);
     });
   }
-  const actions = el("div", "card");
+  const actions = el("div", "card actionsbar");
   function updateBar() {
     const ok = pending.length === req;
-    actions.innerHTML = `<div class="row"><div>Seleccionados: <b>${pending.length}/${req}</b>
-      ${pending.length ? "· " + pending.map(esc).join(", ") : ""}</div><div class="spacer"></div></div>`;
+    actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${ok ? "ok" : ""}">${pending.length}/${req}</b>
+      ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(lastName(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
-      const save = el("button", "btn primary", "Guardar selección");
+      const save = el("button", "btn primary", ok ? "✓ Guardar selección" : "Guardar selección");
       save.disabled = !ok;
       save.onclick = async () => {
         await Store.setPicks(race.name, targetPlayer, pending);
         toast("Selección guardada ✔", "ok");
       };
       actions.querySelector(".row").appendChild(save);
-      if (!ok) actions.appendChild(el("div", "small warn", `Debes elegir exactamente ${req} pilotos.`));
+      if (!ok) {
+        const falta = req - pending.length;
+        actions.appendChild(el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
+      }
     } else {
       actions.appendChild(el("div", "small muted", "⏱️ Inscripción cerrada — ya no puedes modificar tus pilotos. Solo el administrador puede hacer cambios."));
     }
   }
+  updateBar(); v.appendChild(actions);   // barra ARRIBA del cuadro de pilotos (y pegajosa al hacer scroll)
   redraw(); v.appendChild(grid);
-  updateBar(); v.appendChild(actions);
   showHistory(v, targetPlayer);
 }
 

@@ -258,3 +258,31 @@ table.breakdown td{padding:7px 8px}
   main{padding-bottom:76px}          /* espacio para la barra inferior */
   .toast{bottom:84px}
 }
+
+/* ===== v2.1: barra de selección arriba + pulido sencillo ===== */
+/* barra "Seleccionados / Guardar" pegajosa arriba del cuadro de pilotos */
+.actionsbar{position:sticky;top:54px;z-index:15;background:#1a1d26;border-color:#3a3f4d;
+  box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.actionsbar .ok{color:var(--green)}
+@media(max-width:560px){ .actionsbar{top:6px} }   /* en móvil las pestañas van abajo */
+
+/* tarjetas y botones más suaves y limpios */
+.card{border-radius:16px}
+.teamcard{border-radius:14px}
+.btn{border-radius:12px}
+.btn.primary{box-shadow:0 4px 14px rgba(225,6,0,.25)}
+.btn.primary:disabled{box-shadow:none}
+.input,.big-select,select.sel{border-radius:12px}
+
+/* pips de uso más visibles */
+.pip{width:10px;height:10px}
+
+/* fila de piloto elegida: palomita clara */
+.drv.picked .dn::after{content:" ✓";color:var(--tc);font-weight:800}
+
+/* podio más limpio */
+.pod{border-radius:14px}
+.pod .prize{font-size:13px}
+
+/* menos ruido de fondo */
+body{background-image:radial-gradient(1100px 460px at 80% -10%,rgba(225,6,0,.08),transparent 60%)}
