@@ -296,26 +296,40 @@ function renderWho() {
   };
 }
 
-// ---------- v2: quién ya envió su selección ----------
+// ---------- v2: quién ya envió su selección (con selector de carrera) ----------
 function sentCard(v) {
-  // la carrera con inscripción ABIERTA; si ya cerró la qualy, salta a la siguiente
-  const next = nextOpenRace() || S.calendar.find(x => x.status === "upcoming");
-  if (!next) return;
-  const sent = S.players.filter(p => picksOf(next.name, p.code).length > 0);
-  const locked = isLockedForPlayers(next);
+  const races = S.calendar.filter(r => r.status !== "cancelled");
+  if (!races.length) return;
+  // por defecto: la carrera con inscripción ABIERTA (si la qualy ya cerró, salta a la siguiente)
+  const open = nextOpenRace() || S.calendar.find(x => x.status === "upcoming");
+  const defName = open ? open.name : races[races.length - 1].name;
+  if (!ui.sentRace || !races.find(r => r.name === ui.sentRace)) ui.sentRace = defName;
+  const race = races.find(r => r.name === ui.sentRace);
+  const sent = S.players.filter(p => picksOf(race.name, p.code).length > 0);
+  const locked = isLockedForPlayers(race);
+
   const card = el("div", "card");
-  card.innerHTML = `<b>📨 Selecciones para R${next.round} · ${esc(next.name)}</b>
-    <span class="muted small"> ${sent.length}/${S.players.length} enviadas${locked ? ' · <span class="err">inscripción cerrada</span>' : ""}</span>`;
+  const head = el("div", "row");
+  head.innerHTML = `<b>📨 Selecciones enviadas</b>
+    <span class="muted small"> ${sent.length}/${S.players.length}${locked ? ' · <span class="err">inscripción cerrada</span>' : ' · <span class="ok">abierta</span>'}</span><div class="spacer"></div>`;
+  const sel = el("select", "sel");
+  races.forEach(r => sel.innerHTML += `<option value="${r.name}" ${r.name === race.name ? "selected" : ""}>R${r.round} · ${esc(r.name)}${r.name === defName ? " (actual)" : ""}</option>`);
+  sel.onchange = () => { ui.sentRace = sel.value; render(); };
+  head.appendChild(sel);
+  card.appendChild(head);
+
   const bar = el("div", "progressbar");
   bar.innerHTML = `<i style="width:${Math.round(sent.length / Math.max(1, S.players.length) * 100)}%"></i>`;
   card.appendChild(bar);
   const grid = el("div", "sentgrid");
   S.players.forEach(p => {
-    const has = picksOf(next.name, p.code).length > 0;
+    const has = picksOf(race.name, p.code).length > 0;
     grid.appendChild(el("span", "sentchip" + (has ? " yes" : "") + (p.code === user ? " me" : ""), `${has ? "✓ " : ""}${esc(p.shortName)}`));
   });
   card.appendChild(grid);
-  card.appendChild(el("div", "small muted", "Solo se muestra quién ya envió — los pilotos elegidos no se revelan hasta después de la carrera."));
+  card.appendChild(el("div", "small muted", locked
+    ? "Los pilotos elegidos de las carreras cerradas se consultan en la pestaña Resultados."
+    : "Solo se muestra quién ya envió — los pilotos elegidos no se revelan hasta el cierre."));
   v.appendChild(card);
 }
 
