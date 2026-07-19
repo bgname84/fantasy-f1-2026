@@ -298,7 +298,8 @@ function renderWho() {
 
 // ---------- v2: quién ya envió su selección ----------
 function sentCard(v) {
-  const next = S.calendar.find(x => x.status === "upcoming");
+  // la carrera con inscripción ABIERTA; si ya cerró la qualy, salta a la siguiente
+  const next = nextOpenRace() || S.calendar.find(x => x.status === "upcoming");
   if (!next) return;
   const sent = S.players.filter(p => picksOf(next.name, p.code).length > 0);
   const locked = isLockedForPlayers(next);
