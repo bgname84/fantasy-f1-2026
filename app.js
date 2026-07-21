@@ -64,7 +64,7 @@ async function loadOfficialResults(race) {
     ]);
   } catch (e) { console.error(e); toast("La API de F1 respondió con error. Intenta de nuevo en un momento.", "err"); return; }
   const rRace = apiRaces(rr)[0];
-  if (!rRace || !rRace.Results) { toast("Aún no hay resultados oficiales de esta carrera.", "err"); return; }
+  if (!rRace || !rRace.Results) { toast("La F1 aún no publica los resultados de esta carrera (suele tardar un rato después de la bandera a cuadros). Intenta más tarde.", "err"); return; }
   try {
     // mapas piloto<->equipo desde nuestro roster
     const sur2name = {}, teammate = {};
@@ -87,10 +87,58 @@ async function loadOfficialResults(race) {
       const rB = (finished(n) && tmRaced && rpos[n] < rpos[tm]) ? 1 : 0;
       return { driver: n, data: { position: finished(n) ? +posText[n] : "DNF", sprintPos: sprint ? (spos[n] || 0) : 0, qBonus: qB, rBonus: rB } };
     });
-    await Store.setResultsBulk(race.name, entries);
-    toast(`✔ Cargados ${entries.length} pilotos · revisa DOTD y bonos`, "ok");
-    render();
+    if (!entries.length) { toast("No se pudo mapear ningún piloto del resultado.", "err"); return; }
+    showResultsPreview(race, entries, sprint);   // pantalla de confirmación: nada se guarda hasta Aplicar
   } catch (e) { console.error(e); toast("Error procesando los resultados.", "err"); }
+}
+
+// pantalla de confirmación de resultados (vista previa antes de aplicar)
+function showResultsPreview(race, entries, sprint) {
+  const cur = S.results[race.name] || {};
+  const totalOf = e => racePts(e.data.position) + sprintPts(e.data.sprintPos) + e.data.qBonus + e.data.rBonus;
+  const changed = entries.filter(e => {
+    const c = cur[e.driver] || {};
+    return String(c.position) !== String(e.data.position) || (c.sprintPos || 0) !== e.data.sprintPos
+      || (c.qBonus ? 1 : 0) !== e.data.qBonus || (c.rBonus ? 1 : 0) !== e.data.rBonus;
+  }).length;
+
+  const bg = el("div", "modal-bg");
+  const box = el("div", "modal wide");
+  box.appendChild(el("h2", null, "Confirmar resultados"));
+  const sub = el("p", "muted small");
+  sub.innerHTML = `<b>R${race.round} · ${esc(race.name)}</b>${sprint ? ' <span class="badge sprint">SPRINT</span>' : ""} — revisa y confirma. `
+    + (changed ? `<b class="warn">${changed} piloto(s) cambian</b> respecto a lo capturado.` : '<span class="ok">Coincide con lo ya capturado.</span>');
+  box.appendChild(sub);
+
+  const rows = entries.slice().sort((a, b) => totalOf(b) - totalOf(a));
+  let h = `<table class="capture"><thead><tr><th>Piloto</th><th>Pos</th>${sprint ? "<th>Spr</th><th>+Spr</th>" : ""}<th>Q</th><th>R</th><th class="num">Pts</th></tr></thead><tbody>`;
+  rows.forEach(e => {
+    const d = e.data;
+    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(e.driver))}"></span>${esc(lastName(e.driver))}</td>`
+      + `<td>${esc(String(d.position))}</td>`
+      + (sprint ? `<td>${d.sprintPos || ""}</td><td>${sprintPts(d.sprintPos) || ""}</td>` : "")
+      + `<td class="ok">${d.qBonus ? "✓" : ""}</td><td class="ok">${d.rBonus ? "✓" : ""}</td>`
+      + `<td class="num"><b>${totalOf(e)}</b></td></tr>`;
+  });
+  h += "</tbody></table>";
+  const wrap = el("div", "matrix"); wrap.innerHTML = h; box.appendChild(wrap);
+  box.appendChild(el("div", "small muted", sprint
+    ? "Sprint según reglamento: puntos oficiales F1 por posición (8·7·6·5·4·3·2·1) y sin bono de coequipero en el sprint. Los bonos Q/R son de la clasificación y la carrera. El Driver of the Day se asigna a mano y se conserva."
+    : "Q = calificó mejor que su coequipero · R = le ganó en carrera. El Driver of the Day se asigna a mano y se conserva."));
+
+  const apply = el("button", "btn primary block", "✓ Aplicar resultados");
+  apply.onclick = async () => {
+    apply.disabled = true; apply.textContent = "Aplicando…";
+    try {
+      await Store.setResultsBulk(race.name, entries);
+      bg.remove(); toast(`✔ Resultados aplicados (${entries.length} pilotos) · asigna el DOTD`, "ok"); render();
+    } catch (e) { console.error(e); apply.disabled = false; apply.textContent = "✓ Aplicar resultados"; toast("Error al guardar, intenta de nuevo.", "err"); }
+  };
+  const cancel = el("button", "btn block", "Cancelar (no guarda nada)");
+  cancel.onclick = () => bg.remove();
+  box.appendChild(apply); box.appendChild(cancel);
+  bg.appendChild(box); bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  document.body.appendChild(bg);
 }
 
 // ---------- exportar a Excel (admin), parecido al archivo original ----------
