@@ -290,3 +290,6 @@ body{background-image:radial-gradient(1100px 460px at 80% -10%,rgba(225,6,0,.08)
 /* modal ancho para la confirmación de resultados */
 .modal.wide{width:560px;max-width:96vw;max-height:88vh;overflow:auto}
 .modal.wide .matrix table{min-width:0;width:100%}
+
+/* selección enviada pero incompleta (menos pilotos que el límite) */
+.sentchip.partial{border-color:var(--amber);color:var(--amber)}

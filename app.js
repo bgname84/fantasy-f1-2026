@@ -41,66 +41,157 @@ function raceTimes(race) { return SCHED[race.name] || {}; }
 function toCDMXInputValue(date) { return new Date(date.getTime() - 6 * 3600 * 1000).toISOString().slice(0, 16); }
 function cdmxInputToUTCISO(val) { return new Date(val.slice(0, 16) + ":00-06:00").toISOString(); }
 
-// ---------- cargar resultados oficiales (API Ergast/Jolpica) ----------
+// ============================================================
+//  Cargar resultados oficiales — DOS fuentes:
+//   1) OpenF1 (api.openf1.org): datos del cronometraje en vivo, disponibles
+//      a los pocos minutos de la bandera a cuadros. Fuente PRINCIPAL.
+//   2) Ergast/Jolpica: clasificación curada, muy estable pero tarda horas.
+//      Se usa de RESPALDO si OpenF1 aún no tiene la sesión.
+//  Ambas producen exactamente los mismos puntos (validado en 3 carreras,
+//  incluida una con sprint). Nada se guarda hasta que el admin confirma.
+// ============================================================
 const normName = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\./g, "").trim();
 const apiRaces = j => (j && j.MRData && j.MRData.RaceTable && j.MRData.RaceTable.Races) || [];
 async function apiFetch(url, optional) {
   try { const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
   catch (e) { if (optional) { console.warn("opcional falló", url, e); return null; } throw e; }
 }
-async function loadOfficialResults(race) {
-  toast("Cargando resultados oficiales…");
-  // Resolver la ronda por FECHA contra la API (robusto si el calendario cambia, ej. Malasia
-  // insertada a mitad de temporada recorre la numeración). apiRound queda como respaldo.
+function rosterMaps() {
+  const sur2name = {}, teammate = {};
+  S.teams.forEach(tm => {
+    tm.drivers.forEach(d => sur2name[normName(d.split(" ").pop())] = d);
+    if (tm.drivers.length === 2) { teammate[tm.drivers[0]] = tm.drivers[1]; teammate[tm.drivers[1]] = tm.drivers[0]; }
+  });
+  return { sur2name, teammate };
+}
+// R/Q/Sp: { piloto: {pos, classified, finished} }. Reglas del concurso:
+// bonos solo si el coequipero del roster participó; rBonus solo a quien terminó.
+function buildEntries(R, Q, Sp, teammate, sprint) {
+  return Object.keys(R).map(n => {
+    const v = R[n], tm = teammate[n], tmRaced = !!(tm && (tm in R));
+    const ok = v.finished && v.classified;
+    const qB = (n in Q && tmRaced && (!(tm in Q) || Q[n].pos < Q[tm].pos)) ? 1 : 0;
+    const rB = (ok && tmRaced && v.pos < R[tm].pos) ? 1 : 0;
+    const sp = sprint && Sp[n] && Sp[n].classified ? Sp[n].pos : 0;
+    return { driver: n, data: { position: ok ? v.pos : "DNF", sprintPos: sp, qBonus: qB, rBonus: rB } };
+  });
+}
+// ---- Fuente 1: OpenF1 (rápida) ----
+// La API limita las peticiones seguidas: van SECUENCIALES y con reintento.
+// Si falta la clasificación (o el sprint en su caso) devolvemos null para caer
+// al respaldo, en vez de calcular bonos en cero silenciosamente.
+const OF1 = "https://api.openf1.org/v1";
+const of1Cache = {};
+async function of1Get(path, tries) {
+  tries = tries || 3;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(OF1 + path);
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j)) return j; }
+    } catch (e) { console.warn("OpenF1 reintento", path, e); }
+    await new Promise(res => setTimeout(res, 600 * (i + 1)));
+  }
+  return null;
+}
+async function fromOpenF1(race, sprint) {
+  const ourDate = (raceTimes(race).race || "").slice(0, 10);
+  if (!ourDate) return null;
+  const sessions = of1Cache.races || (of1Cache.races = await of1Get("/sessions?year=2026&session_name=Race"));
+  if (!sessions) { of1Cache.races = null; return null; }
+  const rs = sessions.find(s => (s.date_start || "").slice(0, 10) === ourDate);
+  if (!rs) return null;
+  const meetSessions = await of1Get(`/sessions?meeting_key=${rs.meeting_key}`);
+  if (!meetSessions) return null;
+  const raceRes = await of1Get(`/session_result?session_key=${rs.session_key}`);
+  if (!raceRes || !raceRes.length) return null;
+  const drivers = await of1Get(`/drivers?session_key=${rs.session_key}`);
+  if (!drivers || !drivers.length) return null;
+  const keyOf = nombre => { const s = meetSessions.find(x => x.session_name === nombre); return s ? s.session_key : null; };
+  const qKey = keyOf("Qualifying"), sKey = keyOf("Sprint");
+  const qRes = qKey ? await of1Get(`/session_result?session_key=${qKey}`) : null;
+  if (qKey && (!qRes || !qRes.length)) return null;          // sin clasificación no hay bonos fiables
+  let sRes = null;
+  if (sprint && sKey) {
+    sRes = await of1Get(`/session_result?session_key=${sKey}`);
+    if (!sRes || !sRes.length) return null;                  // sprint incompleto → mejor el respaldo
+  }
+  const { sur2name, teammate } = rosterMaps();
+  const num2name = {};
+  drivers.forEach(d => {
+    const apellido = d.last_name || (d.full_name || "").split(" ").pop();
+    const n = sur2name[normName(apellido)];
+    if (n) num2name[d.driver_number] = n;
+  });
+  // OJO: quien abandona puede venir con position=null; sigue contando como "participó"
+  // (su coequipero sí merece el bono), pero se ordena detrás de todos los clasificados.
+  const norm = rows => {
+    const out = {};
+    (rows || []).forEach(r => {
+      const n = num2name[r.driver_number]; if (!n) return;
+      out[n] = {
+        pos: r.position != null ? +r.position : 999,
+        classified: r.position != null,
+        finished: !(r.dnf || r.dns || r.dsq),
+      };
+    });
+    return out;
+  };
+  const R = norm(raceRes);
+  if (!Object.keys(R).length) return null;
+  const enCurso = rs.date_end ? Date.now() < new Date(rs.date_end).getTime() : false;
+  return {
+    entries: buildEntries(R, norm(qRes), norm(sRes), teammate, sprint),
+    source: "OpenF1 · cronometraje en vivo",
+    provisional: enCurso || Object.keys(R).length < 15,
+  };
+}
+// ---- Fuente 2: Ergast/Jolpica (respaldo) ----
+async function fromJolpica(race, sprint) {
   let round = null;
   const ourDate = (raceTimes(race).race || "").slice(0, 10);
   const sched = ourDate ? await apiFetch("https://api.jolpi.ca/ergast/f1/2026.json?limit=100", true) : null;
   const hit = apiRaces(sched).find(r => r.date === ourDate);
   if (hit) round = +hit.round;
   if (!round) round = raceTimes(race).apiRound;
-  if (!round) { toast("La API de F1 aún no incluye esta carrera en su calendario. Intenta más adelante.", "err"); return; }
+  if (!round) return null;
   const base = `https://api.jolpi.ca/ergast/f1/2026/${round}`;
-  const sprint = raceSprint(race);
-  // results es obligatorio; quali y sprint son opcionales (si fallan, sus bonos/sprint quedan en 0)
-  let rr, qq, ss;
-  try {
-    [rr, qq, ss] = await Promise.all([
-      apiFetch(base + "/results.json?limit=100", false),
-      apiFetch(base + "/qualifying.json?limit=100", true),
-      sprint ? apiFetch(base + "/sprint.json?limit=100", true) : Promise.resolve(null),
-    ]);
-  } catch (e) { console.error(e); toast("La API de F1 respondió con error. Intenta de nuevo en un momento.", "err"); return; }
+  const [rr, qq, ss] = await Promise.all([
+    apiFetch(base + "/results.json?limit=100", true),
+    apiFetch(base + "/qualifying.json?limit=100", true),
+    sprint ? apiFetch(base + "/sprint.json?limit=100", true) : Promise.resolve(null),
+  ]);
   const rRace = apiRaces(rr)[0];
-  if (!rRace || !rRace.Results) { toast("La F1 aún no publica los resultados de esta carrera (suele tardar un rato después de la bandera a cuadros). Intenta más tarde.", "err"); return; }
-  try {
-    // mapas piloto<->equipo desde nuestro roster
-    const sur2name = {}, teammate = {};
-    S.teams.forEach(tm => {
-      tm.drivers.forEach(d => sur2name[normName(d.split(" ").pop())] = d);
-      if (tm.drivers.length === 2) { teammate[tm.drivers[0]] = tm.drivers[1]; teammate[tm.drivers[1]] = tm.drivers[0]; }
-    });
-    const nameOf = e => sur2name[normName(e.Driver.familyName)];
-    const qpos = {}, rpos = {}, posText = {}, spos = {};
-    rRace.Results.forEach(r => { const n = nameOf(r); if (!n) return; rpos[n] = +r.position; posText[n] = r.positionText; });
-    ((apiRaces(qq)[0] || {}).QualifyingResults || []).forEach(q => { const n = nameOf(q); if (n) qpos[n] = +q.position; });
-    if (sprint) ((apiRaces(ss)[0] || {}).SprintResults || []).forEach(s => { const n = nameOf(s); if (n) spos[n] = +s.position; });
-    const finished = n => /^\d+$/.test(posText[n]);   // clasificado como finalizador
-    // construir resultados. Bonos SOLO si el coequipero del roster participó (no sustituto/ausente).
-    // rBonus solo si el piloto terminó la carrera (no premia doble-DNF). DOTD lo pone el admin.
-    const entries = Object.keys(rpos).map(n => {
-      const tm = teammate[n];
-      const tmRaced = tm && (tm in rpos);
-      const qB = (n in qpos && tmRaced && (!(tm in qpos) || qpos[n] < qpos[tm])) ? 1 : 0;
-      const rB = (finished(n) && tmRaced && rpos[n] < rpos[tm]) ? 1 : 0;
-      return { driver: n, data: { position: finished(n) ? +posText[n] : "DNF", sprintPos: sprint ? (spos[n] || 0) : 0, qBonus: qB, rBonus: rB } };
-    });
-    if (!entries.length) { toast("No se pudo mapear ningún piloto del resultado.", "err"); return; }
-    showResultsPreview(race, entries, sprint);   // pantalla de confirmación: nada se guarda hasta Aplicar
-  } catch (e) { console.error(e); toast("Error procesando los resultados.", "err"); }
+  if (!rRace || !rRace.Results) return null;
+  const { sur2name, teammate } = rosterMaps();
+  const nameOf = e => sur2name[normName(e.Driver.familyName)];
+  const R = {}, Q = {}, Sp = {};
+  rRace.Results.forEach(r => {
+    const n = nameOf(r); if (!n) return;
+    R[n] = { pos: +r.position, classified: true, finished: /^\d+$/.test(r.positionText) };
+  });
+  ((apiRaces(qq)[0] || {}).QualifyingResults || []).forEach(q => { const n = nameOf(q); if (n) Q[n] = { pos: +q.position, classified: true, finished: true }; });
+  if (sprint) ((apiRaces(ss)[0] || {}).SprintResults || []).forEach(s => { const n = nameOf(s); if (n) Sp[n] = { pos: +s.position, classified: true, finished: true }; });
+  if (!Object.keys(R).length) return null;
+  return { entries: buildEntries(R, Q, Sp, teammate, sprint), source: "Ergast/Jolpica · clasificación oficial", provisional: false };
+}
+async function loadOfficialResults(race) {
+  const sprint = raceSprint(race);
+  toast("Buscando resultados…");
+  let out = null;
+  try { out = await fromOpenF1(race, sprint); } catch (e) { console.warn("OpenF1 falló", e); }
+  if (!out) {
+    toast("Sin datos en vivo todavía; probando la fuente oficial…");
+    try { out = await fromJolpica(race, sprint); } catch (e) { console.warn("Jolpica falló", e); }
+  }
+  if (!out || !out.entries.length) {
+    toast("Todavía no hay resultados publicados de esta carrera. Al terminar suelen tardar unos minutos.", "err");
+    return;
+  }
+  showResultsPreview(race, out.entries, sprint, out);   // confirmación: nada se guarda hasta Aplicar
 }
 
 // pantalla de confirmación de resultados (vista previa antes de aplicar)
-function showResultsPreview(race, entries, sprint) {
+function showResultsPreview(race, entries, sprint, meta) {
   const cur = S.results[race.name] || {};
   const totalOf = e => racePts(e.data.position) + sprintPts(e.data.sprintPos) + e.data.qBonus + e.data.rBonus;
   const changed = entries.filter(e => {
@@ -114,7 +205,9 @@ function showResultsPreview(race, entries, sprint) {
   box.appendChild(el("h2", null, "Confirmar resultados"));
   const sub = el("p", "muted small");
   sub.innerHTML = `<b>R${race.round} · ${esc(race.name)}</b>${sprint ? ' <span class="badge sprint">SPRINT</span>' : ""} — revisa y confirma. `
-    + (changed ? `<b class="warn">${changed} piloto(s) cambian</b> respecto a lo capturado.` : '<span class="ok">Coincide con lo ya capturado.</span>');
+    + (changed ? `<b class="warn">${changed} piloto(s) cambian</b> respecto a lo capturado.` : '<span class="ok">Coincide con lo ya capturado.</span>')
+    + (meta && meta.source ? `<br><span class="muted">Fuente: ${esc(meta.source)} · ${entries.length} pilotos</span>` : "")
+    + (meta && meta.provisional ? '<br><b class="warn">⚠️ Datos provisionales (la carrera puede seguir en curso o faltar la clasificación). Revísalos bien o vuelve a cargar más tarde.</b>' : "");
   box.appendChild(sub);
 
   const rows = entries.slice().sort((a, b) => totalOf(b) - totalOf(a));
@@ -377,9 +470,12 @@ function sentCard(v) {
   bar.innerHTML = `<i style="width:${Math.round(sent.length / Math.max(1, S.players.length) * 100)}%"></i>`;
   card.appendChild(bar);
   const grid = el("div", "sentgrid");
+  const req = race.driversRequired || 4;
   S.players.forEach(p => {
-    const has = picksOf(race.name, p.code).length > 0;
-    grid.appendChild(el("span", "sentchip" + (has ? " yes" : "") + (p.code === user ? " me" : ""), `${has ? "✓ " : ""}${esc(p.shortName)}`));
+    const n = picksOf(race.name, p.code).length;
+    const parcial = n > 0 && n < req;      // enviada pero incompleta: se marca distinto
+    const cls = "sentchip" + (n ? (parcial ? " partial" : " yes") : "") + (p.code === user ? " me" : "");
+    grid.appendChild(el("span", cls, `${n ? (parcial ? n + "/" + req + " " : "✓ ") : ""}${esc(p.shortName)}`));
   });
   card.appendChild(grid);
   card.appendChild(el("div", "small muted", locked
@@ -550,26 +646,39 @@ function viewEquipo(v) {
   }
   const actions = el("div", "card actionsbar");
   function updateBar() {
+    const guardados = picksOf(race.name, targetPlayer);
     const completa = pending.length === req;
-    // el admin puede guardar selecciones incompletas (útil para capturar por otros); el jugador no
-    const ok = admin ? pending.length <= req : completa;
+    // el admin puede guardar selecciones incompletas (útil para capturar por otros); el jugador no.
+    // Guardar 0 NO borra por accidente: para eso está el botón explícito de borrar.
+    const ok = admin ? (pending.length > 0 && pending.length <= req) : completa;
     actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${completa ? "ok" : ""}">${pending.length}/${req}</b>
       ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(lastName(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
       const label = completa ? "✓ Guardar selección"
-        : admin ? (pending.length ? `Guardar ${pending.length} de ${req}` : "Guardar sin pilotos")
-          : "Guardar selección";
+        : (admin && pending.length) ? `Guardar ${pending.length} de ${req}` : "Guardar selección";
       const save = el("button", "btn primary", label);
       save.disabled = !ok;
       save.onclick = async () => {
+        if (pending.length < guardados.length && !(await confirmModal(
+          `${playerName(targetPlayer)} tiene ${guardados.length} pilotos guardados en ${race.name}. Vas a dejar solo ${pending.length}. ¿Continuar?`))) return;
+        save.disabled = true;
         await Store.setPicks(race.name, targetPlayer, pending);
         toast(completa ? "Selección guardada ✔" : `Guardado con ${pending.length} de ${req} pilotos`, "ok");
       };
       actions.querySelector(".row").appendChild(save);
+      if (admin && guardados.length) {          // borrar es una acción aparte y confirmada
+        const del = el("button", "btn", "🗑️ Borrar");
+        del.onclick = async () => {
+          if (!(await confirmModal(`Se borrará la selección de ${playerName(targetPlayer)} en ${race.name} (${guardados.map(lastName).join(", ")}). No se puede deshacer.`))) return;
+          await Store.setPicks(race.name, targetPlayer, []);
+          toast("Selección borrada", "ok");
+        };
+        actions.querySelector(".row").appendChild(del);
+      }
       if (!completa) {
         const falta = req - pending.length;
         actions.appendChild(admin
-          ? el("div", "small muted", `Modo admin: puedes guardar incompleto (máximo ${req} pilotos).`)
+          ? el("div", "small muted", `Modo admin: puedes guardar incompleto (de 1 a ${req} pilotos).`)
           : el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
       }
     } else {
