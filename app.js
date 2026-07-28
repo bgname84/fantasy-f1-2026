@@ -49,11 +49,18 @@ async function apiFetch(url, optional) {
   catch (e) { if (optional) { console.warn("opcional falló", url, e); return null; } throw e; }
 }
 async function loadOfficialResults(race) {
-  const round = raceTimes(race).apiRound;
-  if (!round) { toast("Esta carrera no tiene ronda oficial.", "err"); return; }
+  toast("Cargando resultados oficiales…");
+  // Resolver la ronda por FECHA contra la API (robusto si el calendario cambia, ej. Malasia
+  // insertada a mitad de temporada recorre la numeración). apiRound queda como respaldo.
+  let round = null;
+  const ourDate = (raceTimes(race).race || "").slice(0, 10);
+  const sched = ourDate ? await apiFetch("https://api.jolpi.ca/ergast/f1/2026.json?limit=100", true) : null;
+  const hit = apiRaces(sched).find(r => r.date === ourDate);
+  if (hit) round = +hit.round;
+  if (!round) round = raceTimes(race).apiRound;
+  if (!round) { toast("La API de F1 aún no incluye esta carrera en su calendario. Intenta más adelante.", "err"); return; }
   const base = `https://api.jolpi.ca/ergast/f1/2026/${round}`;
   const sprint = raceSprint(race);
-  toast("Cargando resultados oficiales…");
   // results es obligatorio; quali y sprint son opcionales (si fallan, sus bonos/sprint quedan en 0)
   let rr, qq, ss;
   try {

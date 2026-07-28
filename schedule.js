@@ -24,6 +24,10 @@ window.FF1_SCHEDULE = {
   "ITALIA":     { sprint:false, apiRound:13, quali:"2026-09-05T14:00:00Z", race:"2026-09-06T13:00:00Z" },
   "ESPAÑA":     { sprint:false, apiRound:14, quali:"2026-09-12T14:00:00Z", race:"2026-09-13T13:00:00Z" },
   "BAKU":       { sprint:false, apiRound:15, quali:"2026-09-25T12:00:00Z", race:"2026-09-26T11:00:00Z" },
+  // MALASIA (Sepang, 2-4 oct): agregada al calendario en jul-2026 como sede del GP de Baréin.
+  // Horarios PROVISIONALES (típico Sepang 15:00 local = 07:00 UTC); ajustar cuando la FIA publique.
+  // Sin apiRound fijo: el cargador resuelve la ronda por fecha contra la API.
+  "MALASIA":    { sprint:false, quali:"2026-10-03T07:00:00Z", race:"2026-10-04T07:00:00Z" },
   "SINGAPORE":  { sprint:true,  apiRound:16, sprintQuali:"2026-10-09T12:30:00Z", quali:"2026-10-10T13:00:00Z", race:"2026-10-11T12:00:00Z" },
   "USA":        { sprint:false, apiRound:17, quali:"2026-10-24T21:00:00Z", race:"2026-10-25T20:00:00Z" },
   "MEXICO":     { sprint:false, apiRound:18, quali:"2026-10-31T21:00:00Z", race:"2026-11-01T20:00:00Z" },

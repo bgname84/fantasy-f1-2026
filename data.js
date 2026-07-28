@@ -247,48 +247,55 @@ window.SEASON_DATA = {
   },
   {
    "round": 18,
+   "name": "MALASIA",
+   "status": "upcoming",
+   "sprint": false,
+   "driversRequired": 3
+  },
+  {
+   "round": 19,
    "name": "SINGAPORE",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 19,
+   "round": 20,
    "name": "USA",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 20,
+   "round": 21,
    "name": "MEXICO",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 21,
+   "round": 22,
    "name": "BRAZIL",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 22,
+   "round": 23,
    "name": "LAS VEGAS",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 23,
+   "round": 24,
    "name": "QATAR",
    "status": "upcoming",
    "sprint": false,
    "driversRequired": 4
   },
   {
-   "round": 24,
+   "round": 25,
    "name": "ABU DHABI",
    "status": "upcoming",
    "sprint": false,
