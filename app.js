@@ -66,6 +66,7 @@ function rosterMaps() {
 }
 // R/Q/Sp: { piloto: {pos, classified, finished} }. Reglas del concurso:
 // bonos solo si el coequipero del roster participó; rBonus solo a quien terminó.
+// OJO: Q = PARRILLA DE SALIDA (no la clasificación), así los castigos de parrilla cuentan.
 function buildEntries(R, Q, Sp, teammate, sprint) {
   return Object.keys(R).map(n => {
     const v = R[n], tm = teammate[n], tmRaced = !!(tm && (tm in R));
@@ -107,9 +108,12 @@ async function fromOpenF1(race, sprint) {
   const drivers = await of1Get(`/drivers?session_key=${rs.session_key}`);
   if (!drivers || !drivers.length) return null;
   const keyOf = nombre => { const s = meetSessions.find(x => x.session_name === nombre); return s ? s.session_key : null; };
-  const qKey = keyOf("Qualifying"), sKey = keyOf("Sprint");
-  const qRes = qKey ? await of1Get(`/session_result?session_key=${qKey}`) : null;
-  if (qKey && (!qRes || !qRes.length)) return null;          // sin clasificación no hay bonos fiables
+  const sKey = keyOf("Sprint");
+  // PARRILLA DE SALIDA: OpenF1 no tiene endpoint de parrilla, pero el primer registro
+  // de posición de cada piloto en la sesión ES su posición de salida (validado: coincide
+  // con la parrilla oficial). Se usa para el bono en vez de la clasificación.
+  const posRows = await of1Get(`/position?session_key=${rs.session_key}`);
+  if (!posRows || !posRows.length) return null;              // sin parrilla no hay bonos fiables
   let sRes = null;
   if (sprint && sKey) {
     sRes = await of1Get(`/session_result?session_key=${sKey}`);
@@ -138,9 +142,20 @@ async function fromOpenF1(race, sprint) {
   };
   const R = norm(raceRes);
   if (!Object.keys(R).length) return null;
+  // parrilla = primer registro de posición de cada piloto (el más antiguo por fecha)
+  const primeros = {};
+  posRows.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).forEach(p => {
+    if (!(p.driver_number in primeros)) primeros[p.driver_number] = p;
+  });
+  const G = {};
+  Object.values(primeros).forEach(p => {
+    const n = num2name[p.driver_number];
+    if (n && p.position) G[n] = { pos: +p.position, classified: true, finished: true };
+  });
+  if (!Object.keys(G).length) return null;
   const enCurso = rs.date_end ? Date.now() < new Date(rs.date_end).getTime() : false;
   return {
-    entries: buildEntries(R, norm(qRes), norm(sRes), teammate, sprint),
+    entries: buildEntries(R, G, norm(sRes), teammate, sprint),
     source: "OpenF1 · cronometraje en vivo",
     provisional: enCurso || Object.keys(R).length < 15,
   };
@@ -155,9 +170,8 @@ async function fromJolpica(race, sprint) {
   if (!round) round = raceTimes(race).apiRound;
   if (!round) return null;
   const base = `https://api.jolpi.ca/ergast/f1/2026/${round}`;
-  const [rr, qq, ss] = await Promise.all([
+  const [rr, ss] = await Promise.all([
     apiFetch(base + "/results.json?limit=100", true),
-    apiFetch(base + "/qualifying.json?limit=100", true),
     sprint ? apiFetch(base + "/sprint.json?limit=100", true) : Promise.resolve(null),
   ]);
   const rRace = apiRaces(rr)[0];
@@ -168,8 +182,10 @@ async function fromJolpica(race, sprint) {
   rRace.Results.forEach(r => {
     const n = nameOf(r); if (!n) return;
     R[n] = { pos: +r.position, classified: true, finished: /^\d+$/.test(r.positionText) };
+    // PARRILLA (viene en el propio resultado). grid 0 = salida desde pits → al fondo.
+    const g = +r.grid;
+    Q[n] = { pos: g > 0 ? g : 999, classified: true, finished: true };
   });
-  ((apiRaces(qq)[0] || {}).QualifyingResults || []).forEach(q => { const n = nameOf(q); if (n) Q[n] = { pos: +q.position, classified: true, finished: true }; });
   if (sprint) ((apiRaces(ss)[0] || {}).SprintResults || []).forEach(s => { const n = nameOf(s); if (n) Sp[n] = { pos: +s.position, classified: true, finished: true }; });
   if (!Object.keys(R).length) return null;
   return { entries: buildEntries(R, Q, Sp, teammate, sprint), source: "Ergast/Jolpica · clasificación oficial", provisional: false };
@@ -223,8 +239,8 @@ function showResultsPreview(race, entries, sprint, meta) {
   h += "</tbody></table>";
   const wrap = el("div", "matrix"); wrap.innerHTML = h; box.appendChild(wrap);
   box.appendChild(el("div", "small muted", sprint
-    ? "Sprint según reglamento: puntos oficiales F1 por posición (8·7·6·5·4·3·2·1) y sin bono de coequipero en el sprint. Los bonos Q/R son de la clasificación y la carrera. El Driver of the Day se asigna a mano y se conserva."
-    : "Q = calificó mejor que su coequipero · R = le ganó en carrera. El Driver of the Day se asigna a mano y se conserva."));
+    ? "Sprint según reglamento: puntos oficiales F1 por posición (8·7·6·5·4·3·2·1) y sin bono de coequipero en el sprint. Los bonos Q/R salen de la parrilla de salida y de la carrera. El Driver of the Day se asigna a mano y se conserva."
+    : "Q = salió por delante de su coequipero en la PARRILLA (incluye castigos) · R = le ganó en carrera. El Driver of the Day se asigna a mano y se conserva."));
 
   const apply = el("button", "btn primary block", "✓ Aplicar resultados");
   apply.onclick = async () => {
@@ -871,7 +887,7 @@ function viewResultados(v) {
     tb.appendChild(tr);
   });
   tbl.appendChild(tb); wrap.appendChild(tbl); card.appendChild(wrap);
-  card.appendChild(el("div", "legend", '<span>Pos = posición final (número, o DNF/DNS/DSQ)</span><span>Q✓ = calificó mejor que su compañero</span><span>R✓ = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
+  card.appendChild(el("div", "legend", '<span>Pos = posición final (número, o DNF/DNS/DSQ)</span><span>Q✓ = salió por delante de su compañero (parrilla)</span><span>R✓ = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
   v.appendChild(card);
   consultaSection(v);
 }
@@ -966,7 +982,7 @@ function resultsReadOnly(v) {
   });
   h += "</tbody></table>";
   const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
-  card.appendChild(el("div", "legend", '<span>Pos = posición final</span><span>Q = calificó mejor que su compañero</span><span>R = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
+  card.appendChild(el("div", "legend", '<span>Pos = posición final</span><span>Q = salió por delante de su compañero (parrilla)</span><span>R = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
   v.appendChild(card);
 }
 
