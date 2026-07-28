@@ -550,20 +550,27 @@ function viewEquipo(v) {
   }
   const actions = el("div", "card actionsbar");
   function updateBar() {
-    const ok = pending.length === req;
-    actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${ok ? "ok" : ""}">${pending.length}/${req}</b>
+    const completa = pending.length === req;
+    // el admin puede guardar selecciones incompletas (útil para capturar por otros); el jugador no
+    const ok = admin ? pending.length <= req : completa;
+    actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${completa ? "ok" : ""}">${pending.length}/${req}</b>
       ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(lastName(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
-      const save = el("button", "btn primary", ok ? "✓ Guardar selección" : "Guardar selección");
+      const label = completa ? "✓ Guardar selección"
+        : admin ? (pending.length ? `Guardar ${pending.length} de ${req}` : "Guardar sin pilotos")
+          : "Guardar selección";
+      const save = el("button", "btn primary", label);
       save.disabled = !ok;
       save.onclick = async () => {
         await Store.setPicks(race.name, targetPlayer, pending);
-        toast("Selección guardada ✔", "ok");
+        toast(completa ? "Selección guardada ✔" : `Guardado con ${pending.length} de ${req} pilotos`, "ok");
       };
       actions.querySelector(".row").appendChild(save);
-      if (!ok) {
+      if (!completa) {
         const falta = req - pending.length;
-        actions.appendChild(el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
+        actions.appendChild(admin
+          ? el("div", "small muted", `Modo admin: puedes guardar incompleto (máximo ${req} pilotos).`)
+          : el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
       }
     } else {
       actions.appendChild(el("div", "small muted", "⏱️ Inscripción cerrada — ya no puedes modificar tus pilotos. Solo el administrador puede hacer cambios."));
