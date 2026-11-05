@@ -22,10 +22,12 @@ window.FF1_CONFIG = {
   // el asiento conserva su nombre interno (con el que ya hay selecciones y puntos
   // guardados) y solo cambia la ETIQUETA que ve la gente. El admin la cambia desde
   // Resultados -> Pilotos sustituidos, sin tocar nada de lo ya guardado.
-  SEATS: {
-    // Haas dio de baja a Ocon el 31-oct-2026 por el resto de la temporada.
-    // Todavia no anuncian al titular de Brasil en adelante: cambia la etiqueta
-    // en Resultados cuando lo confirmen.
-    "Esteban Ocon": { current: "Sustituto HAAS" },
-  },
+  // Vacio = cada asiento se muestra con el nombre de su titular.
+  // Haas dio de baja a Ocon el 31-oct-2026 pero NO ha anunciado al titular de
+  // Brasil en adelante, asi que el asiento se queda a nombre de Ocon hasta que
+  // se defina. En cuanto lo confirmen, pon el nombre desde la app:
+  // Resultados -> "Pilotos sustituidos" (no hace falta tocar este archivo).
+  // Ojo: esto es SOLO la etiqueta. Los puntos ya van por el AUTO en cualquier
+  // caso, asi que si vuelve a manejar un sustituto sus puntos se acreditan igual.
+  SEATS: {},
 };
