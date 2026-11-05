@@ -278,6 +278,11 @@ function showResultsPreview(race, entries, sprint, meta) {
   const subTxt = Object.keys(subBySeat)
     .map(k => esc(lastName(subBySeat[k].api)) + " → auto " + esc(subBySeat[k].team))
     .join(" · ");
+  // asientos del roster que se quedaron SIN resultado. Es justo el sintoma de un
+  // cambio de piloto que no se pudo acreditar: en un concurso con dinero conviene
+  // verlo antes de guardar, no despues.
+  const conDatos = new Set(entries.map(e => e.driver));
+  const faltan = S.teams.flatMap(t => t.drivers).filter(d => !conDatos.has(d));
 
   const bg = el("div", "modal-bg");
   const box = el("div", "modal wide");
@@ -287,7 +292,8 @@ function showResultsPreview(race, entries, sprint, meta) {
     + (changed ? `<b class="warn">${changed} piloto(s) cambian</b> respecto a lo capturado.` : '<span class="ok">Coincide con lo ya capturado.</span>')
     + (meta && meta.source ? `<br><span class="muted">Fuente: ${esc(meta.source)} · ${entries.length} pilotos</span>` : "")
     + (meta && meta.provisional ? '<br><b class="warn">⚠️ Datos provisionales (la carrera puede seguir en curso o faltar la clasificación). Revísalos bien o vuelve a cargar más tarde.</b>' : "")
-    + (subTxt ? `<br><b class="warn">🔁 Sustituciones: ${subTxt}</b> — los puntos se acreditan al <b>auto</b>, según reglamento.` : "");
+    + (subTxt ? `<br><b class="warn">🔁 Sustituciones: ${subTxt}</b> — los puntos se acreditan al <b>auto</b>, según reglamento.` : "")
+    + (faltan.length ? `<br><b class="err">⚠️ Sin resultado: ${faltan.map(d => esc(dispLast(d))).join(", ")}</b> — revisa si hubo un cambio de piloto que no se pudo acreditar antes de aplicar.` : "");
   box.appendChild(sub);
 
   const rows = entries.slice().sort((a, b) => totalOf(b) - totalOf(a));
