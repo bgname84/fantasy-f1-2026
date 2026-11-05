@@ -51,6 +51,16 @@
         players.push({ code, fullName: e.fullName || code, shortName: e.shortName || code });
       }
     });
+    // ---- Pilotos sustituidos (guardado en race_meta bajo "__seats__") ----
+    // Los puntos van por el AUTO: el asiento mantiene su nombre interno y solo
+    // cambia la etiqueta visible, asi no se rompen picks ni resultados guardados.
+    const seatEdits = ((overlay.raceMeta || {})["__seats__"] || {}).edits || {};
+    const seats = {};
+    const seatBase = (window.FF1_CONFIG && window.FF1_CONFIG.SEATS) || {};
+    Object.keys(seatBase).forEach(d => { seats[d] = Object.assign({}, seatBase[d]); });
+    Object.keys(seatEdits).forEach(d => { seats[d] = Object.assign({}, seats[d], seatEdits[d]); });
+    Object.keys(seats).forEach(d => { if (!seats[d].current) delete seats[d]; });
+
     const creds = {};
     SEED.players.forEach(p => { if (seedCreds[p.code]) creds[p.code] = seedCreds[p.code]; });
     Object.keys(rosterEdits).forEach(code => { if (rosterEdits[code].password) creds[code] = rosterEdits[code].password; });
@@ -60,6 +70,7 @@
       pointsSystem: SEED.pointsSystem,
       teams: SEED.teams,
       driverTeam: SEED.driverTeam,
+      seats,
       players,
       creds,
       rosterEdits,

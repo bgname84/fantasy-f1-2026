@@ -18,6 +18,14 @@ const PS = () => S.pointsSystem;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const lastName = n => { const p = String(n).trim().split(" "); return p[p.length - 1]; };
 const teamOf = d => S.driverTeam[d];
+// ---- Pilotos sustituidos: los puntos van por el AUTO, no por el piloto ----
+// El asiento guarda SIEMPRE su nombre interno (con el que ya hay selecciones y
+// resultados); aqui solo se traduce a la etiqueta que ve la gente.
+const seatOf = d => (S && S.seats && S.seats[d]) || null;
+const dispName = d => { const s = seatOf(d); return s ? s.current : d; };
+const dispLast = d => { const s = seatOf(d); return s ? s.current : lastName(d); };
+const exLabel = d => { const s = seatOf(d); return s ? " (ex " + lastName(d) + ")" : ""; };
+const fullLabel = d => dispName(d) + exLabel(d);
 // Colores oficiales de las escuderías 2026
 const TEAM_COLORS = {
   "MERCEDES": "#27F4D2", "RED BULL": "#3671C6", "FERRARI": "#E8002D",
@@ -57,12 +65,32 @@ async function apiFetch(url, optional) {
   catch (e) { if (optional) { console.warn("opcional falló", url, e); return null; } throw e; }
 }
 function rosterMaps() {
-  const sur2name = {}, teammate = {};
+  const sur2name = {}, teammate = {}, teamDrivers = {};
   S.teams.forEach(tm => {
+    teamDrivers[tm.name] = tm.drivers.slice();
     tm.drivers.forEach(d => sur2name[normName(d.split(" ").pop())] = d);
     if (tm.drivers.length === 2) { teammate[tm.drivers[0]] = tm.drivers[1]; teammate[tm.drivers[1]] = tm.drivers[0]; }
   });
-  return { sur2name, teammate };
+  return { sur2name, teammate, teamDrivers };
+}
+// SUSTITUCIONES — reglamento: los puntos van por el AUTO, no por el piloto.
+// Un piloto que la API reporta y que no esta en el roster (un sustituto) se
+// acredita al asiento libre de su MISMO equipo. El equipo de la API se deduce
+// del coequipero que SI reconocimos, asi no hace falta ninguna tabla de alias
+// y sirve para cualquier sustitucion futura, no solo la de Ocon.
+// Si los DOS pilotos de un equipo son desconocidos no hay forma de saber quien
+// ocupa cual asiento: se dejan fuera y la pantalla de confirmacion lo avisa.
+function asignarSustitutos(sobran, apiTeam2ours, teamDrivers, tomados) {
+  const subs = [];
+  sobran.forEach(x => {
+    const ours = apiTeam2ours[normName(x.team || "")];
+    if (!ours) return;
+    const libre = (teamDrivers[ours] || []).find(d => !tomados.has(d));
+    if (!libre) return;
+    tomados.add(libre);
+    subs.push({ api: x.name, seat: libre, team: ours, key: x.key });
+  });
+  return subs;
 }
 // R/Q/Sp: { piloto: {pos, classified, finished} }. Reglas del concurso:
 // bonos solo si el coequipero del roster participó; rBonus solo a quien terminó.
@@ -119,13 +147,23 @@ async function fromOpenF1(race, sprint) {
     sRes = await of1Get(`/session_result?session_key=${sKey}`);
     if (!sRes || !sRes.length) return null;                  // sprint incompleto → mejor el respaldo
   }
-  const { sur2name, teammate } = rosterMaps();
-  const num2name = {};
+  const { sur2name, teammate, teamDrivers } = rosterMaps();
+  const num2name = {}, apiTeam2ours = {}, tomados = new Set(), sobran = [];
   drivers.forEach(d => {
     const apellido = d.last_name || (d.full_name || "").split(" ").pop();
     const n = sur2name[normName(apellido)];
-    if (n) num2name[d.driver_number] = n;
+    if (n) {
+      num2name[d.driver_number] = n; tomados.add(n);
+      const t = S.driverTeam[n]; if (t && d.team_name) apiTeam2ours[normName(d.team_name)] = t;
+    } else {
+      sobran.push({
+        key: d.driver_number, team: d.team_name,
+        name: d.full_name || [d.first_name, d.last_name].filter(Boolean).join(" ") || ("#" + d.driver_number),
+      });
+    }
   });
+  const subs = asignarSustitutos(sobran, apiTeam2ours, teamDrivers, tomados);
+  subs.forEach(s => { num2name[s.key] = s.seat; });
   // OJO: quien abandona puede venir con position=null; sigue contando como "participó"
   // (su coequipero sí merece el bono), pero se ordena detrás de todos los clasificados.
   const norm = rows => {
@@ -158,6 +196,7 @@ async function fromOpenF1(race, sprint) {
     entries: buildEntries(R, G, norm(sRes), teammate, sprint),
     source: "OpenF1 · cronometraje en vivo",
     provisional: enCurso || Object.keys(R).length < 15,
+    subs,
   };
 }
 // ---- Fuente 2: Ergast/Jolpica (respaldo) ----
@@ -176,8 +215,25 @@ async function fromJolpica(race, sprint) {
   ]);
   const rRace = apiRaces(rr)[0];
   if (!rRace || !rRace.Results) return null;
-  const { sur2name, teammate } = rosterMaps();
-  const nameOf = e => sur2name[normName(e.Driver.familyName)];
+  const { sur2name, teammate, teamDrivers } = rosterMaps();
+  const apiTeam2ours = {}, tomados = new Set(), sobran = [], asiento = {};
+  rRace.Results.forEach(r => {                      // 1a pasada: los que si estan en el roster
+    const k = normName(r.Driver.familyName), n = sur2name[k];
+    if (!n) return;
+    asiento[k] = n; tomados.add(n);
+    const t = S.driverTeam[n]; if (t && r.Constructor) apiTeam2ours[normName(r.Constructor.name)] = t;
+  });
+  rRace.Results.forEach(r => {                      // 2a pasada: los sustitutos -> al auto
+    const k = normName(r.Driver.familyName);
+    if (asiento[k] || sobran.some(x => x.key === k)) return;
+    sobran.push({
+      key: k, team: (r.Constructor || {}).name,
+      name: [r.Driver.givenName, r.Driver.familyName].filter(Boolean).join(" "),
+    });
+  });
+  const subs = asignarSustitutos(sobran, apiTeam2ours, teamDrivers, tomados);
+  subs.forEach(s => { asiento[s.key] = s.seat; });
+  const nameOf = e => asiento[normName(e.Driver.familyName)];
   const R = {}, Q = {}, Sp = {};
   rRace.Results.forEach(r => {
     const n = nameOf(r); if (!n) return;
@@ -188,7 +244,7 @@ async function fromJolpica(race, sprint) {
   });
   if (sprint) ((apiRaces(ss)[0] || {}).SprintResults || []).forEach(s => { const n = nameOf(s); if (n) Sp[n] = { pos: +s.position, classified: true, finished: true }; });
   if (!Object.keys(R).length) return null;
-  return { entries: buildEntries(R, Q, Sp, teammate, sprint), source: "Ergast/Jolpica · clasificación oficial", provisional: false };
+  return { entries: buildEntries(R, Q, Sp, teammate, sprint), source: "Ergast/Jolpica · clasificación oficial", provisional: false, subs };
 }
 async function loadOfficialResults(race) {
   const sprint = raceSprint(race);
@@ -216,6 +272,13 @@ function showResultsPreview(race, entries, sprint, meta) {
       || (c.qBonus ? 1 : 0) !== e.data.qBonus || (c.rBonus ? 1 : 0) !== e.data.rBonus;
   }).length;
 
+  // sustituciones detectadas: el resultado del sustituto se acredito al AUTO
+  const subBySeat = {};
+  ((meta && meta.subs) || []).forEach(s => { subBySeat[s.seat] = s; });
+  const subTxt = Object.keys(subBySeat)
+    .map(k => esc(lastName(subBySeat[k].api)) + " → auto " + esc(subBySeat[k].team))
+    .join(" · ");
+
   const bg = el("div", "modal-bg");
   const box = el("div", "modal wide");
   box.appendChild(el("h2", null, "Confirmar resultados"));
@@ -223,14 +286,17 @@ function showResultsPreview(race, entries, sprint, meta) {
   sub.innerHTML = `<b>R${race.round} · ${esc(race.name)}</b>${sprint ? ' <span class="badge sprint">SPRINT</span>' : ""} — revisa y confirma. `
     + (changed ? `<b class="warn">${changed} piloto(s) cambian</b> respecto a lo capturado.` : '<span class="ok">Coincide con lo ya capturado.</span>')
     + (meta && meta.source ? `<br><span class="muted">Fuente: ${esc(meta.source)} · ${entries.length} pilotos</span>` : "")
-    + (meta && meta.provisional ? '<br><b class="warn">⚠️ Datos provisionales (la carrera puede seguir en curso o faltar la clasificación). Revísalos bien o vuelve a cargar más tarde.</b>' : "");
+    + (meta && meta.provisional ? '<br><b class="warn">⚠️ Datos provisionales (la carrera puede seguir en curso o faltar la clasificación). Revísalos bien o vuelve a cargar más tarde.</b>' : "")
+    + (subTxt ? `<br><b class="warn">🔁 Sustituciones: ${subTxt}</b> — los puntos se acreditan al <b>auto</b>, según reglamento.` : "");
   box.appendChild(sub);
 
   const rows = entries.slice().sort((a, b) => totalOf(b) - totalOf(a));
   let h = `<table class="capture"><thead><tr><th>Piloto</th><th>Pos</th>${sprint ? "<th>Spr</th><th>+Spr</th>" : ""}<th>Q</th><th>R</th><th class="num">Pts</th></tr></thead><tbody>`;
   rows.forEach(e => {
     const d = e.data;
-    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(e.driver))}"></span>${esc(lastName(e.driver))}</td>`
+    const sb = subBySeat[e.driver];
+    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(e.driver))}"></span>${esc(dispLast(e.driver))}`
+      + (sb ? ` <span class="small warn">← ${esc(lastName(sb.api))}</span>` : "") + `</td>`
       + `<td>${esc(String(d.position))}</td>`
       + (sprint ? `<td>${d.sprintPos || ""}</td><td>${sprintPts(d.sprintPos) || ""}</td>` : "")
       + `<td class="ok">${d.qBonus ? "✓" : ""}</td><td class="ok">${d.rBonus ? "✓" : ""}</td>`
@@ -311,7 +377,7 @@ async function exportResultsExcel() {
       const res = S.results[r.name] || {};
       Object.keys(res).sort((a, b) => driverPoints(res[b]) - driverPoints(res[a])).forEach(d => {
         const x = res[d];
-        off.push([r.name, d, teamOf(d) || "", x.position, racePts(x.position), sprintPts(x.sprintPos),
+        off.push([r.name, fullLabel(d), teamOf(d) || "", x.position, racePts(x.position), sprintPts(x.sprintPos),
           x.qBonus ? 1 : 0, x.rBonus ? 1 : 0, x.otd ? 1 : 0, driverPoints(x)]);
       });
     });
@@ -461,25 +527,28 @@ function renderWho() {
 }
 
 // ---------- v2: quién ya envió su selección (con selector de carrera) ----------
-function sentCard(v) {
+function sentCard(v, fixedRace) {
   const races = S.calendar.filter(r => r.status !== "cancelled");
   if (!races.length) return;
   // por defecto: la carrera con inscripción ABIERTA (si la qualy ya cerró, salta a la siguiente)
   const open = nextOpenRace() || S.calendar.find(x => x.status === "upcoming");
   const defName = open ? open.name : races[races.length - 1].name;
   if (!ui.sentRace || !races.find(r => r.name === ui.sentRace)) ui.sentRace = defName;
-  const race = races.find(r => r.name === ui.sentRace);
+  // en Mi equipo se fija a la carrera elegida ahí (evita un segundo selector en la misma pantalla)
+  const race = fixedRace || races.find(r => r.name === ui.sentRace);
   const sent = S.players.filter(p => picksOf(race.name, p.code).length > 0);
   const locked = isLockedForPlayers(race);
 
   const card = el("div", "card");
   const head = el("div", "row");
-  head.innerHTML = `<b>📨 Selecciones enviadas</b>
+  head.innerHTML = `<b>📨 Selecciones enviadas${fixedRace ? ` · R${race.round} ${esc(race.name)}` : ""}</b>
     <span class="muted small"> ${sent.length}/${S.players.length}${locked ? ' · <span class="err">inscripción cerrada</span>' : ' · <span class="ok">abierta</span>'}</span><div class="spacer"></div>`;
-  const sel = el("select", "sel");
-  races.forEach(r => sel.innerHTML += `<option value="${r.name}" ${r.name === race.name ? "selected" : ""}>R${r.round} · ${esc(r.name)}${r.name === defName ? " (actual)" : ""}</option>`);
-  sel.onchange = () => { ui.sentRace = sel.value; render(); };
-  head.appendChild(sel);
+  if (!fixedRace) {
+    const sel = el("select", "sel");
+    races.forEach(r => sel.innerHTML += `<option value="${r.name}" ${r.name === race.name ? "selected" : ""}>R${r.round} · ${esc(r.name)}${r.name === defName ? " (actual)" : ""}</option>`);
+    sel.onchange = () => { ui.sentRace = sel.value; render(); };
+    head.appendChild(sel);
+  }
   card.appendChild(head);
 
   const bar = el("div", "progressbar");
@@ -631,6 +700,7 @@ function viewEquipo(v) {
         ${!locked ? `· cierra en <b data-deadline="${dl.toISOString()}">—</b>` : `· <span class="err">cerrada</span>`}</div>` : ""}
      ${locked && admin ? `<div class="small warn" style="margin-top:6px">Inscripción cerrada para jugadores — editas como ADMIN.</div>` : ""}`;
   v.appendChild(info);
+  sentCard(v, race);      // quién ya envió, para esta misma carrera (sin saltar de pestaña)
 
   const grid = el("div", "teamgrid");
   function redraw() {
@@ -649,7 +719,7 @@ function viewEquipo(v) {
         const disabled = !canEdit || teammatePicked || maxed || (full && !isPicked);
         const row = el("div", "drv" + (isPicked ? " picked" : "") + (disabled ? " disabled" : ""));
         const pips = [0, 1, 2, 3].map(i => `<span class="pip ${i < used ? (used >= 4 ? "full" : "used") : ""}"></span>`).join("");
-        row.innerHTML = `<div><div class="dn">${esc(d)}</div><div class="small muted">${used}/4 usadas${teammatePicked ? " · compañero elegido" : maxed ? " · sin cupo" : ""}</div></div><div class="pips">${pips}</div>`;
+        row.innerHTML = `<div><div class="dn">${esc(dispName(d))}${seatOf(d) ? ` <span class="small muted">${esc(exLabel(d).trim())}</span>` : ""}</div><div class="small muted">${used}/4 usadas${teammatePicked ? " · compañero elegido" : maxed ? " · sin cupo" : ""}</div></div><div class="pips">${pips}</div>`;
         if (!disabled) row.onclick = () => {
           if (isPicked) pending = pending.filter(x => x !== d);
           else if (pending.length < req) pending.push(d);
@@ -668,7 +738,7 @@ function viewEquipo(v) {
     // Guardar 0 NO borra por accidente: para eso está el botón explícito de borrar.
     const ok = admin ? (pending.length > 0 && pending.length <= req) : completa;
     actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${completa ? "ok" : ""}">${pending.length}/${req}</b>
-      ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(lastName(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
+      ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(dispLast(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
       const label = completa ? "✓ Guardar selección"
         : (admin && pending.length) ? `Guardar ${pending.length} de ${req}` : "Guardar selección";
@@ -733,7 +803,7 @@ function viewPilotos(v) {
     t.drivers.forEach(d => {
       const used = usageCount(user, d);
       const pips = [0, 1, 2, 3].map(i => `<span class="pip ${i < used ? (used >= 4 ? "full" : "used") : ""}"></span>`).join("");
-      tc.appendChild(el("div", "drv", `<div><div class="dn">${esc(d)}</div><div class="small ${used >= 4 ? "warn" : "muted"}">${4 - used} disponibles</div></div><div class="pips">${pips}</div>`));
+      tc.appendChild(el("div", "drv", `<div><div class="dn">${esc(dispName(d))}${seatOf(d) ? ` <span class="small muted">${esc(exLabel(d).trim())}</span>` : ""}</div><div class="small ${used >= 4 ? "warn" : "muted"}">${4 - used} disponibles</div></div><div class="pips">${pips}</div>`));
     });
     grid.appendChild(tc);
   });
@@ -750,7 +820,7 @@ function viewPilotos(v) {
     const allDrivers = S.teams.flatMap(t => t.drivers);
     const wrap = el("div", "matrix");
     let h = '<table><thead><tr><th>Jugador</th>';
-    allDrivers.forEach(d => h += `<th class="c" title="${esc(d)}">${esc(lastName(d).slice(0, 3))}</th>`);
+    allDrivers.forEach(d => h += `<th class="c" title="${esc(fullLabel(d))}">${esc(dispLast(d).slice(0, 3))}</th>`);
     h += "</tr></thead><tbody>";
     S.players.forEach(p => {
       h += `<tr class="${p.code === user ? "me" : ""}"><td>${esc(p.shortName)}</td>`;
@@ -826,6 +896,7 @@ function viewResultados(v) {
   expRow.appendChild(el("div", "small muted", "Descarga un Excel con la tabla de Puntos, el detalle por jugador y los resultados oficiales por carrera (estilo del archivo original)."));
   bar.appendChild(expRow);
   v.appendChild(bar);
+  seatAdminCard(v);
 
   // which drivers to show: picked by anyone (+ optional all)
   const picked = new Set();
@@ -858,7 +929,7 @@ function viewResultados(v) {
     const q = `<input type="checkbox" ${res.qBonus ? "checked" : ""}>`;
     const r = `<input type="checkbox" ${res.rBonus ? "checked" : ""}>`;
     const dotd = `<input type="radio" name="dotd_${race.name}" ${res.otd ? "checked" : ""}>`;
-    tr.innerHTML = `<td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(lastName(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>
+    tr.innerHTML = `<td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(dispLast(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>
       <td>${posI}</td>${sprint ? `<td>${spI}</td>` : ""}<td>${q}</td><td>${r}</td><td>${dotd}</td><td class="num pts-${cssId(d)}">${driverPoints(res)}</td>`;
     const [posInp, spInp] = tr.querySelectorAll("input.input");
     const [qC, rC] = tr.querySelectorAll('input[type=checkbox]');
@@ -872,7 +943,7 @@ function viewResultados(v) {
     const saveDriver = async (extra) => {
       const data = Object.assign(collect(), extra || {});
       await Store.setResult(race.name, d, data);
-      toast("Guardado " + lastName(d), "ok");
+      toast("Guardado " + dispLast(d), "ok");
     };
     posInp.onchange = () => saveDriver();
     if (spInp) spInp.onchange = () => saveDriver();
@@ -916,7 +987,7 @@ function consultaSection(v) {
     const totalP = per.reduce((s, x) => s + x.p, 0);
     const cnt = {};
     played.forEach(r => picksOf(r.name, code).forEach(d => cnt[d] = (cnt[d] || 0) + 1));
-    const fav = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d, c]) => `${esc(lastName(d))} ×${c}`).join(", ");
+    const fav = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d, c]) => `${esc(dispLast(d))} ×${c}`).join(", ");
     const place = standings().find(r => r.code === code);
     const stat = el("div", "statrow");
     stat.innerHTML = `
@@ -939,7 +1010,7 @@ function consultaSection(v) {
     h += `<tr class="grp"><td colspan="6">R${r.round} · ${esc(r.name)}${raceSprint(r) ? " (sprint)" : ""}</td><td class="num">${rp}</td></tr>`;
     pk.forEach(d => {
       const x = (S.results[r.name] && S.results[r.name][d]) || {};
-      h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span>${esc(lastName(d))} <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
+      h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span>${esc(dispLast(d))} <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
         + `<td>${x.position != null ? esc(String(x.position)) : ""}</td>`
         + `<td>${sprintPts(x.sprintPos) || ""}</td>`
         + `<td class="ok">${chk(x.qBonus)}</td><td class="ok">${chk(x.rBonus)}</td><td style="color:var(--gold)">${chk(x.otd)}</td>`
@@ -974,7 +1045,7 @@ function resultsReadOnly(v) {
   let h = `<table class="capture"><thead><tr><th>Piloto</th><th>Pos</th>${sprint ? "<th>Spr</th>" : ""}<th>Q</th><th>R</th><th>DOTD</th><th class="num">Pts</th></tr></thead><tbody>`;
   drivers.forEach(d => {
     const x = res[d];
-    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(lastName(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
+    h += `<tr><td><span class="tdot" style="background:${teamColor(teamOf(d))}"></span><b>${esc(dispLast(d))}</b> <span class="small tm" style="color:${teamColor(teamOf(d))}">${esc(teamOf(d) || "")}</span></td>`
       + `<td>${x.position != null ? esc(String(x.position)) : ""}</td>`
       + (sprint ? `<td>${x.sprintPos || ""}</td>` : "")
       + `<td class="ok">${chk(x.qBonus)}</td><td class="ok">${chk(x.rBonus)}</td><td style="color:var(--gold)">${chk(x.otd)}</td>`
@@ -983,6 +1054,65 @@ function resultsReadOnly(v) {
   h += "</tbody></table>";
   const wrap = el("div", "matrix"); wrap.innerHTML = h; card.appendChild(wrap);
   card.appendChild(el("div", "legend", '<span>Pos = posición final</span><span>Q = salió por delante de su compañero (parrilla)</span><span>R = le ganó en carrera</span><span>DOTD = Driver of the Day</span>'));
+  v.appendChild(card);
+}
+
+// ---------- pilotos sustituidos (admin) ----------
+// Reglamento: los puntos van por el AUTO. Esto solo cambia la ETIQUETA visible
+// del asiento; las selecciones y los puntos ya guardados quedan intactos.
+function seatAdminCard(v) {
+  const card = el("div", "card");
+  card.appendChild(el("div", "row", "<b>\u{1F501} Pilotos sustituidos</b>"));
+  card.appendChild(el("div", "small muted",
+    "Reglamento: los puntos van por el <b>auto</b>, no por el piloto. Si a un titular lo bajan, pon aqu\u00ed qui\u00e9n lo maneja ahora: "
+    + "cambia el nombre que ve la gente y lo que llegue de la API se acredita a ese auto. "
+    + "<b>Las selecciones y los puntos ya guardados no se tocan</b>, as\u00ed que quien us\u00f3 al titular antes conserva sus puntos."));
+
+  const row = el("div", "row"); row.style.marginTop = "8px";
+  const sel = el("select", "sel");
+  S.teams.forEach(t => {
+    let o = `<optgroup label="${esc(t.name)}">`;
+    t.drivers.forEach(d => { o += `<option value="${esc(d)}">${esc(d)}${seatOf(d) ? " \u2192 " + esc(seatOf(d).current) : ""}</option>`; });
+    sel.innerHTML += o + "</optgroup>";
+  });
+  const inp = el("input", "input"); inp.placeholder = "Nombre del sustituto"; inp.style.maxWidth = "200px";
+  const sync = () => { const s2 = seatOf(sel.value); inp.value = s2 ? s2.current : ""; };
+  sel.onchange = sync; sync();
+
+  const save = el("button", "btn primary", "Guardar");
+  save.onclick = async () => {
+    const d = sel.value, nom = inp.value.trim();
+    if (!nom) { toast("Escribe qui\u00e9n maneja el auto", "err"); return; }
+    if (nom === d) { toast("Es el mismo nombre; usa \u201cQuitar\u201d para restaurarlo.", "err"); return; }
+    save.disabled = true;
+    try {
+      const e = {}; e[d] = { current: nom };
+      await Store.setRaceMeta("__seats__", { edits: e });
+      toast(lastName(d) + " \u2192 " + nom, "ok"); render();
+    } catch (err) { console.error(err); save.disabled = false; toast("No se pudo guardar, intenta de nuevo.", "err"); }
+  };
+  row.appendChild(wrapLabel("Asiento (titular)", sel));
+  row.appendChild(wrapLabel("Ahora lo maneja", inp));
+  row.appendChild(save);
+  card.appendChild(row);
+
+  const act = Object.keys(S.seats || {});
+  if (act.length) {
+    const list = el("div", "row"); list.style.marginTop = "10px";
+    list.appendChild(el("div", "small muted", "Activos:"));
+    act.forEach(d => {
+      list.appendChild(el("div", "sentchip me", `${esc(lastName(d))} \u2192 ${esc(S.seats[d].current)}`));
+      const x = el("button", "btn", "Quitar");
+      x.onclick = async () => {
+        if (!await confirmModal(`El auto volver\u00e1 a aparecer como \u201c${d}\u201d. Los puntos y las selecciones no cambian.`)) return;
+        const e = {}; e[d] = { current: null };
+        await Store.setRaceMeta("__seats__", { edits: e });
+        toast("Restaurado", "ok"); render();
+      };
+      list.appendChild(x);
+    });
+    card.appendChild(list);
+  }
   v.appendChild(card);
 }
 

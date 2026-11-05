@@ -17,4 +17,15 @@ window.FF1_CONFIG = {
   // Administradores: códigos de jugador que entran como ADMIN automáticamente
   // (con su propio código de acceso). BG = Beli Garcia, FV = Federico Valverde.
   ADMINS: ["BG", "FV"],
+  // ---- Pilotos sustituidos (regla del AUTO) ----
+  // El reglamento da los puntos al AUTO, no al piloto. Si a un titular lo bajan,
+  // el asiento conserva su nombre interno (con el que ya hay selecciones y puntos
+  // guardados) y solo cambia la ETIQUETA que ve la gente. El admin la cambia desde
+  // Resultados -> Pilotos sustituidos, sin tocar nada de lo ya guardado.
+  SEATS: {
+    // Haas dio de baja a Ocon el 31-oct-2026 por el resto de la temporada.
+    // Todavia no anuncian al titular de Brasil en adelante: cambia la etiqueta
+    // en Resultados cuando lo confirmen.
+    "Esteban Ocon": { current: "Sustituto HAAS" },
+  },
 };
