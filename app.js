@@ -18,6 +18,7 @@ const PS = () => S.pointsSystem;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const lastName = n => { const p = String(n).trim().split(" "); return p[p.length - 1]; };
 const teamOf = d => S.driverTeam[d];
+const reqOf = r => (r && r.driversRequired) || 4;   // pilotos que pide la carrera
 // ---- Pilotos sustituidos: los puntos van por el AUTO, no por el piloto ----
 // El asiento guarda SIEMPRE su nombre interno (con el que ya hay selecciones y
 // resultados); aqui solo se traduce a la etiqueta que ve la gente.
@@ -561,7 +562,7 @@ function sentCard(v, fixedRace) {
   bar.innerHTML = `<i style="width:${Math.round(sent.length / Math.max(1, S.players.length) * 100)}%"></i>`;
   card.appendChild(bar);
   const grid = el("div", "sentgrid");
-  const req = race.driversRequired || 4;
+  const req = reqOf(race);
   S.players.forEach(p => {
     const n = picksOf(race.name, p.code).length;
     const parcial = n > 0 && n < req;      // enviada pero incompleta: se marca distinto
@@ -692,7 +693,7 @@ function viewEquipo(v) {
 
   const locked = isLockedForPlayers(race);
   const canEdit = admin || !locked;
-  const req = race.driversRequired || 3;
+  const req = reqOf(race);
   const dl = raceDeadline(race);
   let pending = picksOf(race.name, targetPlayer).slice();
 
@@ -705,6 +706,14 @@ function viewEquipo(v) {
      ${dl ? `<div class="small" style="margin-top:8px">Cierre de inscripción: <b>${esc(fmtCDMX(dl))}</b> (CDMX)
         ${!locked ? `· cierra en <b data-deadline="${dl.toISOString()}">—</b>` : `· <span class="err">cerrada</span>`}</div>` : ""}
      ${locked && admin ? `<div class="small warn" style="margin-top:6px">Inscripción cerrada para jugadores — editas como ADMIN.</div>` : ""}`;
+  // Pilotos que todavia puede armar: 1 por equipo y con cupo (<4 usos). Si son menos
+  // que los que pide la carrera, el reglamento le impide completar: se avisa de frente
+  // en vez de dejar que lo descubra clicando.
+  const equiposLibres = S.teams.filter(t => t.drivers.some(d => usageCount(targetPlayer, d, race.name) < 4)).length;
+  if (canEdit && equiposLibres < req) {
+    info.appendChild(el("div", "small warn", `Con tus cupos disponibles solo puedes armar <b>${equiposLibres}</b> de los ${req} pilotos `
+      + "(no puedes repetir equipo y ya agotaste las 4 carreras de varios pilotos). Guarda con los que puedas: es válido."));
+  }
   v.appendChild(info);
   sentCard(v, race);      // quién ya envió, para esta misma carrera (sin saltar de pestaña)
 
@@ -740,19 +749,25 @@ function viewEquipo(v) {
   function updateBar() {
     const guardados = picksOf(race.name, targetPlayer);
     const completa = pending.length === req;
-    // el admin puede guardar selecciones incompletas (útil para capturar por otros); el jugador no.
+    // Se puede guardar INCOMPLETO (1..máx): hay casos en que el reglamento no deja
+    // completar — sin repetir equipo y con pilotos que ya agotaron sus 4 carreras.
     // Guardar 0 NO borra por accidente: para eso está el botón explícito de borrar.
-    const ok = admin ? (pending.length > 0 && pending.length <= req) : completa;
+    const ok = pending.length > 0 && pending.length <= req;
     actions.innerHTML = `<div class="row"><div>Seleccionados: <b class="${completa ? "ok" : ""}">${pending.length}/${req}</b>
       ${pending.length ? `<span class="muted small"> · ${pending.map(d => esc(dispLast(d))).join(", ")}</span>` : ""}</div><div class="spacer"></div></div>`;
     if (canEdit) {
       const label = completa ? "✓ Guardar selección"
-        : (admin && pending.length) ? `Guardar ${pending.length} de ${req}` : "Guardar selección";
+        : pending.length ? `Guardar ${pending.length} de ${req}` : "Guardar selección";
       const save = el("button", "btn primary", label);
       save.disabled = !ok;
       save.onclick = async () => {
-        if (pending.length < guardados.length && !(await confirmModal(
-          `${playerName(targetPlayer)} tiene ${guardados.length} pilotos guardados en ${race.name}. Vas a dejar solo ${pending.length}. ¿Continuar?`))) return;
+        const avisos = [];
+        if (pending.length < guardados.length)
+          avisos.push(`${playerName(targetPlayer)} tiene ${guardados.length} pilotos guardados en ${race.name} y vas a dejar solo ${pending.length}.`);
+        else if (!completa)
+          avisos.push(`Vas a guardar ${pending.length} de ${req} pilotos.`);
+        if (!completa) avisos.push("Los lugares que falten no suman puntos en esta carrera.");
+        if (avisos.length && !(await confirmModal(avisos.join(" ") + " ¿Continuar?"))) return;
         save.disabled = true;
         await Store.setPicks(race.name, targetPlayer, pending);
         toast(completa ? "Selección guardada ✔" : `Guardado con ${pending.length} de ${req} pilotos`, "ok");
@@ -769,9 +784,9 @@ function viewEquipo(v) {
       }
       if (!completa) {
         const falta = req - pending.length;
-        actions.appendChild(admin
-          ? el("div", "small muted", `Modo admin: puedes guardar incompleto (de 1 a ${req} pilotos).`)
-          : el("div", "small warn", falta === 1 ? "Te falta 1 piloto por elegir." : `Te faltan ${falta} pilotos por elegir.`));
+        actions.appendChild(el("div", "small warn",
+          (falta === 1 ? "Falta 1 piloto" : `Faltan ${falta} pilotos`) + " para la selección completa. "
+          + "Puedes guardar así si las reglas no te dejan completar; los lugares vacíos no suman puntos."));
       }
     } else {
       actions.appendChild(el("div", "small muted", "⏱️ Inscripción cerrada — ya no puedes modificar tus pilotos. Solo el administrador puede hacer cambios."));
