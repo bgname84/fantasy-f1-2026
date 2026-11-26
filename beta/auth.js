@@ -1,0 +1,32 @@
+// Credenciales de acceso (control de acceso ligero para liga de amigos).
+// Cada jugador entra con su nombre + este código. Cámbialos si quieres.
+window.FF1_USERS = {
+ "FV": "ENVV",
+ "PC": "3EJY",
+ "EV": "YWRX",
+ "ANC": "W799",
+ "GYH": "U99X",
+ "BG": "TJAY",
+ "PF": "DEME",
+ "IA": "TA4U",
+ "MR": "4NHQ",
+ "CV": "KPPQ",
+ "SYJ": "7V3D",
+ "MV": "7NDW",
+ "JYF": "WMMT",
+ "MAM": "F366",
+ "LG": "XMA6",
+ "CM": "PPTR",
+ "WC": "DQXW",
+ "DA": "UERV",
+ "SS": "9YUQ",
+ "NYG": "VKRX",
+ "AC": "UVVA",
+ "JV": "XJ9F",
+ "GD": "C6V4",
+ "AF": "E6YR",
+ "SR": "UFUJ",
+ "JR": "E36T",
+ "JMF": "4U6W",
+ "LA": "KWQ4"
+};
