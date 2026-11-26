@@ -17,14 +17,22 @@ window.FF1_CONFIG = {
   // Administradores: códigos de jugador que entran como ADMIN automáticamente
   // (con su propio código de acceso). BG = Beli Garcia, FV = Federico Valverde.
   ADMINS: ["BG", "FV"],
-  // ------------------------------------------------------------
-  //  BETA: ESCRITURA ACTIVADA (misma base que la app estable).
-  //  Las dos versiones apuntan al MISMO proyecto de Supabase, así que
-  //  hay una sola base de datos: lo que guardes en la beta aparece al
-  //  instante en la estable y al revés (store.js se suscribe a los
-  //  cambios en vivo de picks/results/race_meta/payments).
-  //  Si alguna vez quieres congelar la beta para que no escriba,
-  //  cambia esto a true y toda escritura queda bloqueada.
-  // ------------------------------------------------------------
+  // ---- Pilotos sustituidos (regla del AUTO) ----
+  // El reglamento da los puntos al AUTO, no al piloto. Si a un titular lo bajan,
+  // el asiento conserva su nombre interno (con el que ya hay selecciones y puntos
+  // guardados) y solo cambia la ETIQUETA que ve la gente. El admin la cambia desde
+  // Resultados -> Pilotos sustituidos, sin tocar nada de lo ya guardado.
+  // Vacio = cada asiento se muestra con el nombre de su titular.
+  // Haas dio de baja a Ocon el 31-oct-2026 pero NO ha anunciado al titular de
+  // Brasil en adelante, asi que el asiento se queda a nombre de Ocon hasta que
+  // se defina. En cuanto lo confirmen, pon el nombre desde la app:
+  // Resultados -> "Pilotos sustituidos" (no hace falta tocar este archivo).
+  // Ojo: esto es SOLO la etiqueta. Los puntos ya van por el AUTO en cualquier
+  // caso, asi que si vuelve a manejar un sustituto sus puntos se acreditan igual.
+  SEATS: {},
+  // ---- BETA ----
+  // Las dos versiones usan la MISMA base, asi que una seleccion guardada aqui
+  // se ve igual en la estable. Pon true para congelar la beta (bloquea toda
+  // escritura sin tocar la lectura ni la sincronizacion en vivo).
   READ_ONLY: false,
 };

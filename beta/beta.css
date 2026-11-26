@@ -1,0 +1,71 @@
+/* Estilos exclusivos de la BETA. styles.css es copia exacta de la estable. */
+/* ============================================================
+   BETA — estilos de la versión de prueba
+   ============================================================ */
+.betatag{display:inline-block;background:linear-gradient(90deg,#8b5cf6,#c026d3);color:#fff;
+  font-size:9px;font-weight:900;letter-spacing:1px;padding:1px 6px;border-radius:4px;
+  vertical-align:middle;margin-left:4px}
+.betabar{background:linear-gradient(90deg,rgba(139,92,246,.18),rgba(192,38,211,.10));
+  border:1px solid rgba(139,92,246,.45);border-radius:12px;padding:10px 14px;margin-bottom:14px;
+  font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.betabar b{color:#c4b5fd}
+.betabar a{color:#c4b5fd;text-decoration:underline;cursor:pointer}
+
+/* --- contenedor de pills (alias de .statrow) --- */
+.statpills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+
+/* --- chips de pilotos / jugadores --- */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-left-width:3px;
+  border-radius:8px;padding:4px 9px;font-size:12px;white-space:nowrap}
+.chip b{color:#fff}
+.chip.me{background:rgba(225,6,0,.16);border-color:var(--red)}
+
+/* --- aviso dentro de tarjeta --- */
+.warnbox{background:rgba(255,170,0,.10);border:1px solid rgba(255,170,0,.45);
+  border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px;line-height:1.45}
+.warnbox b{color:#ffd48a}
+
+/* --- duelo directo --- */
+.duel{display:flex;align-items:center;gap:10px;margin-top:6px}
+.duelside{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;min-width:0}
+.duelside .dname{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.duelside .dpts{font-size:22px;font-weight:900;margin-top:2px}
+.duelmid{text-align:center;min-width:92px}
+.duelmid .dscore{font-size:20px;font-weight:900;font-style:italic;color:var(--red)}
+
+/* --- medallas / logros --- */
+.medals{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;margin-top:10px}
+.medal{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;
+  opacity:.38;filter:grayscale(1)}
+.medal.on{opacity:1;filter:none;border-color:rgba(139,92,246,.55);
+  background:linear-gradient(180deg,rgba(139,92,246,.14),var(--panel2))}
+.medal .mi{font-size:24px;line-height:1}
+.medal .mn{font-weight:800;font-size:12.5px;margin-top:4px}
+.medal .md{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+
+@media(max-width:560px){
+  .duelmid{min-width:70px}
+  .duelside .dpts{font-size:18px}
+  .medals{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+}
+
+/* --- lista "El cierre está escrito" --- */
+.cllist{margin-top:12px}
+.clrow{border-top:1px solid var(--line);padding:11px 0}
+.clrow.me{background:rgba(225,6,0,.07);border-radius:10px;padding-left:8px;padding-right:8px}
+.clhead{display:flex;gap:9px;align-items:baseline}
+.clpos{color:var(--muted);font-weight:800;font-size:12px;min-width:18px}
+.clname{flex:1;font-weight:800;min-width:0;line-height:1.25}
+.clpts{font-weight:900;font-size:17px}
+.cldif{color:var(--muted);font-size:12px;min-width:34px;text-align:right}
+.clmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.clmeta .spacer{flex:1}
+.clrow .chips{margin-top:7px}
+
+/* --- gráfica de posición y caja de compartir --- */
+.poschart{width:100%;height:auto;display:block;margin:10px 0 4px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:12px}
+.sharebox{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;
+  white-space:pre-wrap;word-break:break-word;margin:10px 0}

@@ -347,7 +347,7 @@
       const g = el("div", "chips");
       if (pool.length) pool.forEach(d => {
         const c = el("span", "chip"); c.style.borderLeftColor = teamColor(teamOf(d));
-        c.innerHTML = `${esc(lastName(d))} <b>${drvAvg(d).toFixed(0)}</b>`;
+        c.innerHTML = `${esc(dispLast(d))} <b>${drvAvg(d).toFixed(0)}</b>`;
         g.appendChild(c);
       });
       else g.appendChild(el("span", "small muted", "sin cupo libre"));
@@ -395,7 +395,7 @@
       pool.forEach(([d, n]) => {
         const c = el("span", "chip");
         c.style.borderColor = teamColor(teamOf(d));
-        c.innerHTML = `${esc(d)} <b>${n}</b> uso${n > 1 ? "s" : ""} <span class="muted">· ${drvAvg(d).toFixed(1)} pts/carrera</span>`;
+        c.innerHTML = `${esc(dispName(d))} <b>${n}</b> uso${n > 1 ? "s" : ""} <span class="muted">· ${drvAvg(d).toFixed(1)} pts/carrera</span>`;
         g.appendChild(c);
       });
       card.appendChild(el("div", "muted small", "Pilotos con cupo disponible:"));
@@ -431,7 +431,7 @@
       const g = el("div", "chips");
       s.drvs.slice(0, 6).forEach(o => {
         const c = el("span", "chip"); c.style.borderColor = teamColor(teamOf(o.d));
-        c.innerHTML = `${esc(lastName(o.d))} <b>${o.s}</b> pts <span class="muted">· ${o.n} usos</span>`;
+        c.innerHTML = `${esc(dispLast(o.d))} <b>${o.s}</b> pts <span class="muted">· ${o.n} usos</span>`;
         g.appendChild(c);
       });
       card.appendChild(g);
@@ -485,9 +485,9 @@
     card.appendChild(el("h2", null, "📜 Récords de la temporada"));
     const pills = [];
     if (r.bigRace) pills.push(["Mejor carrera de alguien", `${r.bigRace.pts} pts`, `${playerName(r.bigRace.code)} · ${r.bigRace.race}`]);
-    if (r.bigPick) pills.push(["Mejor piloto en una carrera", `${r.bigPick.pts} pts`, `${lastName(r.bigPick.driver)} · ${r.bigPick.race}`]);
-    if (r.mostPicked) pills.push(["El más elegido", `${r.mostPicked[1]} veces`, lastName(r.mostPicked[0])]);
-    if (r.bestValue) pills.push(["El más rentable", `${r.bestValue[1].toFixed(1)} pts`, `${lastName(r.bestValue[0])} · por carrera`]);
+    if (r.bigPick) pills.push(["Mejor piloto en una carrera", `${r.bigPick.pts} pts`, `${dispLast(r.bigPick.driver)} · ${r.bigPick.race}`]);
+    if (r.mostPicked) pills.push(["El más elegido", `${r.mostPicked[1]} veces`, dispLast(r.mostPicked[0])]);
+    if (r.bestValue) pills.push(["El más rentable", `${r.bestValue[1].toFixed(1)} pts`, `${dispLast(r.bestValue[0])} · por carrera`]);
     const lg = standings();
     pills.push(["Pelea por el título", `${lg[0].total - lg[1].total} pts`, `${lg[0].name.split(" ")[0]} vs ${lg[1].name.split(" ")[0]}`]);
     let h = '<div class="statpills">';
@@ -596,9 +596,9 @@
     const r = biggestRegret(user);
     if (r) {
       card.appendChild(el("div", "warnbox",
-        `El cambio que más te habría servido: en <b>${esc(r.race)}</b>, poner a <b>${esc(lastName(r.inn))}</b> ` +
-        `en vez de <b>${esc(lastName(r.out))}</b> te habría dado <b>+${r.gain}</b> puntos. ` +
-        `(Tenías cupo de ${esc(lastName(r.inn))} esa temporada.)`));
+        `El cambio que más te habría servido: en <b>${esc(r.race)}</b>, poner a <b>${esc(dispLast(r.inn))}</b> ` +
+        `en vez de <b>${esc(dispLast(r.out))}</b> te habría dado <b>+${r.gain}</b> puntos. ` +
+        `(Tenías cupo de ${esc(dispLast(r.inn))} esa temporada.)`));
       const after = st[i].total + r.gain;
       const np = st.filter(z => z.total > after).length + 1;
       if (np < st[i].place) card.appendChild(el("div", "small muted",
