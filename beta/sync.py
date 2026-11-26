@@ -45,8 +45,10 @@ patch("index.html", [
      '<div class="brand-sub">Temporada 2026 <span class="betatag">BETA</span></div>'),
     ('<link rel="stylesheet" href="styles.css">',
      '<link rel="stylesheet" href="styles.css">\n<link rel="stylesheet" href="beta.css">'),
-    ('  <button data-tab="pagos">',
-     '  <button data-tab="stats"><span class="ti">🔮</span><span class="tl">Cierre</span></button>\n  <button data-tab="pagos">'),
+    # "Cierre" va PRIMERO y es la pestaña que abre por defecto
+    ('  <button data-tab="tabla" class="active"><span class="ti">🏆</span><span class="tl">Tabla</span></button>',
+     '  <button data-tab="stats" class="active"><span class="ti">🔮</span><span class="tl">Cierre</span></button>\n'
+     '  <button data-tab="tabla"><span class="ti">🏆</span><span class="tl">Tabla</span></button>'),
     ('<script src="app.js"></script>',
      '<script src="app.js"></script>\n<script src="engage.js"></script>'),
 ])
@@ -62,8 +64,9 @@ patch("config.js", [
      '  READ_ONLY: false,\n};'),
 ])
 
-# 4) app.js: que el despacho de vistas acepte las pestañas nuevas de la beta
+# 4) app.js: despacho de vistas de la beta + pestaña inicial
 patch("app.js", [
+    ('let tab = "tabla";', 'let tab = "stats";   // la beta abre en "Cierre"'),
     ("  ({ tabla: viewTabla, equipo: viewEquipo, pilotos: viewPilotos, resultados: viewResultados, pagos: viewPagos }[tab])(v);",
      "  const VIEWS = Object.assign({ tabla: viewTabla, equipo: viewEquipo, pilotos: viewPilotos, resultados: viewResultados, pagos: viewPagos }, window.FF1_VIEWS || {});\n"
      "  (VIEWS[tab] || VIEWS.tabla)(v);"),

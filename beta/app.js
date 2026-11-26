@@ -9,7 +9,7 @@ let viewAsPlayer = localStorage.getItem("ff1_view_player") === "1"; // admin vie
 let admin = false;                                       // se calcula en render() según whitelist
 const ADMINS = (window.FF1_CONFIG && window.FF1_CONFIG.ADMINS) || [];
 const canBeAdmin = code => ADMINS.includes(code);
-let tab = "tabla";
+let tab = "stats";   // la beta abre en "Cierre"
 let ui = { equipoRace: null, equipoPlayer: null, resRace: null, pilotosAll: false };
 
 const $ = (s, r = document) => r.querySelector(s);

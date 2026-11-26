@@ -669,6 +669,7 @@
   function viewStats(v) {
     clearCache();
     v.appendChild(betaBar());
+    v.appendChild(countdownBanner());   // es la portada: el cierre de inscripcion va hasta arriba
     closingCard(v);
     myViabilityCard(v);
     nudgeCard(v);
@@ -689,8 +690,6 @@
     clearCache();
     v.appendChild(betaBar());
     _tabla(v);
-    myViabilityCard(v);
-    duelCard(v);
   };
 
   const _equipo = window.viewEquipo;
